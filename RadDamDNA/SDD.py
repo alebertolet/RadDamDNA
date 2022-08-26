@@ -7,17 +7,33 @@ Created on 8/16/22 10:32 AM
 """
 
 import numpy as np
-import pandas as pd
+import random
 import matplotlib.pyplot as plt
+from scipy import interpolate
+from matplotlib.colors import LinearSegmentedColormap
 
 class DamageToDNA:
     def __init__(self):
+        self.initializeStructures()
+        self.initializeCounters()
+        self.SetUpColorMap()
+
+    def initializeStructures(self):
         self.damageSites = []
         self.doses = np.array([])
         self.accumulateDose = 0
         self.damageMap = {}
+        self.damagePositions = {}
         self.Darray = []
         self.DSBarray = []
+        self.DSBPositions = []
+
+    def initializeCounters(self):
+        self.numSB = 0; self.numSBDirect = 0; self.numSBIndirect = 0
+        self.numSSB = 0; self.numSSBDirect = 0; self.numSSBIndirect = 0
+        self.numDSB = 0; self.numDSBDirect = 0; self.numDSBIndirect = 0; self.numDSBHybrid = 0
+        self.numBD = 0; self.numBDDirect = 0; self.numBDIndirect = 0
+        self.numSSBPlus = 0; self.numDSBPlus = 0; self.numDSBComplex = 0
 
     def readSDDAndDose(self, path, namessd = 'DNADamage_sdd.txt', namephsp = 'DNADamage.phsp'):
         dosepath = path + namephsp
@@ -29,6 +45,8 @@ class DamageToDNA:
         sddpath = path + namessd
         self.readFromSDD(sddpath)
         f.close()
+        self.namessd = namessd
+        self.namephsp = namephsp
 
     def readFromSDD(self, path):
         reader = SDDReader(path)
@@ -39,7 +57,7 @@ class DamageToDNA:
             dsite = DamageSite()
             for key in d:
                 setattr(dsite, key, d[key])
-            dsite.initialBp = int(dsite.ChromosomePosition * self.Chromosomesizes[dsite.chromosomeNumber]*1e6)
+            dsite.initialBp = np.round(dsite.ChromosomePosition * self.Chromosomesizes[dsite.chromosomeNumber]*1e6)
             self.damageSites.append(dsite)
 
     def populateDamages(self):
@@ -49,22 +67,27 @@ class DamageToDNA:
             iCh = damage.chromosomeNumber
             if iCh not in self.damageMap.keys():
                 self.damageMap[iCh] = {}
+                self.damagePositions[iCh] = {}
             for bpdamage in damage.individualdamages:
-                iBp = damage.initialBp+bpdamage['basepairID']
+                iBp = int(damage.initialBp+bpdamage['basepairID'])
                 if iBp not in self.damageMap[iCh].keys():
                     self.damageMap[iCh][iBp] = {}
+                    self.damagePositions[iCh][iBp] = {}
                 self.damageMap[iCh][damage.initialBp+bpdamage['basepairID']][bpdamage['subcomponent']] = bpdamage['type']
+                self.damagePositions[iCh][damage.initialBp+bpdamage['basepairID']][bpdamage['subcomponent']] = [damage.centerX, damage.centerY, damage.centerZ]
             if damage.newExposure > 1:
                 iExposure += 1
                 self.accumulateDose += self.doses[iExposure]
                 self.Darray.append(self.accumulateDose)
-                self.DSBarray.append(self.computeStrandBreaks())
+                self.computeStrandBreaks()
+                self.DSBarray.append(self.numDSB)
 
     def computeStrandBreaks(self):
         DSBMap = {}
         DSBPairs = {}
         SSBMap = {}
         BDMap = {}
+        self.DSBPositions = []
         for iCh in self.damageMap.keys():
             if iCh not in DSBMap.keys():
                 DSBMap[iCh] = {}
@@ -118,6 +141,9 @@ class DamageToDNA:
                                 DSBMap[iCh][iBp+i2][2] = adjustedTypeDamageInStrand2
                                 pos = (closestPosInStrand1, iBp + i2)
                                 DSBPairs[iCh][pos] = adjustedTypeDamageInStrand1 + adjustedTypeDamageInStrand2
+                                posSB1 = np.array(self.damagePositions[iCh][closestPosInStrand1][2])
+                                posSB2 = np.array(self.damagePositions[iCh][iBp+i2][3])
+                                self.DSBPositions.append((posSB1 + posSB2)/2)
                                 dsbFound = True
                         if iBp-i2 >= 0 and iBp-i2 in self.damageMap[iCh].keys() and 3 in self.damageMap[iCh][iBp-i2].keys():
                             typeDamageInStrand2 = self.damageMap[iCh][iBp - i2][3]
@@ -155,14 +181,92 @@ class DamageToDNA:
                                     DSBMap[iCh][iBp-i2][2] = adjustedTypeDamageInStrand2
                                     pos = (closestPosInStrand1, iBp - i2)
                                     DSBPairs[iCh][pos] = adjustedTypeDamageInStrand1 + adjustedTypeDamageInStrand2
+                                    posSB1 = np.array(self.damagePositions[iCh][closestPosInStrand1][2])
+                                    posSB2 = np.array(self.damagePositions[iCh][iBp - i2][3])
+                                    self.DSBPositions.append((posSB1 + posSB2) / 2)
                                     dsbFound = True
                         if dsbFound:
                             break
-        ndsb = 0
-        for iCh in DSBPairs.keys():
-            ndsb = ndsb + len(DSBPairs[iCh])
-        return ndsb
-        #Loops through damage map to exclude
+
+        #Loops through damage map to exclude DSBs
+        for iCh in self.damageMap.keys():
+            if iCh not in SSBMap.keys():
+                SSBMap[iCh] = {}
+            if iCh not in BDMap.keys():
+                BDMap[iCh] = {}
+            for iBp in self.damageMap[iCh]:
+                if iBp not in SSBMap[iCh].keys():
+                    SSBMap[iCh][iBp] = {}
+                if iBp not in BDMap[iCh].keys():
+                    BDMap[iCh][iBp] = {}
+                # Single Strand breaks
+                if (2 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][2] > 0 and (1 not in DSBMap[iCh][iBp].keys() or not DSBMap[iCh][iBp][1] > 0)) or (3 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][3] > 0 and (2 not in DSBMap[iCh][iBp].keys() or not DSBMap[iCh][iBp][2] > 0)):
+                    if 2 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][2] > 0:
+                        SSBMap[iCh][iBp][1] = self.damageMap[iCh][iBp][2]
+                    if 3 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][3] > 0:
+                        SSBMap[iCh][iBp][2] = self.damageMap[iCh][iBp][3]
+                # Base damages
+                if 1 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][1] > 0:
+                    BDMap[iCh][iBp][1] = self.damageMap[iCh][iBp][1]
+                if 4 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][4] > 0:
+                    BDMap[iCh][iBp][2] = self.damageMap[iCh][iBp][4]
+        self.quantifyDamage(DSBPairs, SSBMap, BDMap)
+
+    def quantifyDamage(self, DSBPairs, SSBMap, BDMap):
+        self.initializeCounters()
+        for iCh in DSBPairs:
+            for pos in DSBPairs[iCh]:
+                typeDamage = DSBPairs[iCh][pos]
+                if typeDamage > 0:
+                    self.numDSB += 1
+                    self.numSB += 2
+                    if typeDamage == 2:
+                        self.numDSBDirect += 1; self.numSBDirect += 2
+                    if typeDamage == 3:
+                        self.numDSBHybrid += 1; self.numSBDirect += 1; self.numSBIndirect += 1
+                    if typeDamage == 4:
+                        self.numDSBIndirect += 1; self.numSBIndirect += 2
+        for iCh in SSBMap:
+            for iBp in SSBMap[iCh]:
+                for iCo in SSBMap[iCh][iBp]:
+                    typeDamage = SSBMap[iCh][iBp][iCo]
+                    if typeDamage > 0:
+                        self.numSSB += 1
+                        self.numSB += 1
+                        if typeDamage == 1 or typeDamage == 3:
+                            self.numSSBDirect += 1; self.numSBDirect += 1
+                        if typeDamage == 2:
+                            self.numSSBIndirect += 1; self.numSBIndirect += 1
+        for iCh in BDMap:
+            for iBp in BDMap[iCh]:
+                for iCo in BDMap[iCh][iBp]:
+                    typeDamage = BDMap[iCh][iBp][iCo]
+                    if typeDamage > 0:
+                        self.numBD += 1
+                        if typeDamage == 1 or typeDamage == 3:
+                            self.numBDDirect += 1
+                        if typeDamage == 2:
+                            self.numBDIndirect += 1
+
+    def printDamageCount(self):
+        print("Summary of damage")
+        print("-----------------")
+        print("Dose", self.accumulateDose, "Gy")
+        print("DSB", self.numDSB)
+        print("DSB_Direct", self.numDSBDirect)
+        print("DSB_Indirect", self.numDSBIndirect)
+        print("DSB_Hybrid", self.numDSBHybrid)
+        print("SSB", self.numSSB)
+        print("SSB_Direct", self.numSSBDirect)
+        print("SSB_Indirect", self.numSSBIndirect)
+        print("SB", self.numSB)
+        print("SB_Direct", self.numSBDirect)
+        print("SB_Indirect", self.numSBIndirect)
+        print("BD", self.numBD)
+        print("BD_Direct", self.numBDDirect)
+        print("BD_Indirect", self.numBDIndirect)
+        print("DSB positions", len(self.DSBPositions))
+        print("Number of foci", self.getNumberOfFoci(0.5))
 
     def plotDoseResponseCurve(self):
         fig = plt.figure()
@@ -171,10 +275,179 @@ class DamageToDNA:
         ax.plot(self.Darray, self.DSBarray)
         ax.set_xlim(0, None)
         ax.set_ylim(0, None)
+        ax.set_xlabel('Dose (Gy)')
+        ax.set_ylabel('DSB')
         ax.grid()
         fig.tight_layout()
         plt.show()
 
+    def getNumberOfFoci(self, fociSize = 0.4):
+        indexIsAvailable = []
+        for i in range(len(self.DSBPositions)):
+            indexIsAvailable.append(True)
+        vectorOfDSBsinEachFocus = []
+        dsbIdsInThisFocus = []
+        for i in range(len(self.DSBPositions)):
+            if indexIsAvailable[i]:
+                indexIsAvailable[i] = False
+                dsbIdsInThisFocus.append(i)
+                for j in range(len(self.DSBPositions)):
+                    if indexIsAvailable[j] and self.getDistance(self.DSBPositions[i], self.DSBPositions[j]) < fociSize / 2:
+                        indexIsAvailable[j] = False
+                        dsbIdsInThisFocus.append(j)
+                vectorOfDSBsinEachFocus.append(dsbIdsInThisFocus)
+            dsbIdsInThisFocus = []
+        return len(vectorOfDSBsinEachFocus)
+
+    def getDistance(self, a, b):
+        return np.sqrt(np.sum(np.power(a-b, 2)))
+
+    def produce3DImage(self, microscopePSFWidth = 0.4, resolution = 0.4, xmin = -5, xmax = 5, ymin = -5, ymax = 5, zmin = -5, zmax = 5):
+        dx = resolution
+        dy = resolution
+        dz = resolution
+        nx = int(np.floor((xmax - xmin) / dx + 1e-14) + 1)
+        ny = int(np.floor((ymax - ymin) / dy + 1e-14) + 1)
+        nz = int(np.floor((zmax - zmin) / dz + 1e-14) + 1)
+        img3d = np.zeros([nx, ny, nz])
+        # Gets the PSF (Gaussian)
+        halfsize = np.floor(3 * microscopePSFWidth / resolution)
+        if halfsize < 3:
+            halfsize = 3
+        nkernel = int(2 * halfsize + 1)
+        psf = np.zeros([nkernel, nkernel, nkernel])
+        minkernel = -halfsize * resolution
+        sum = 0
+        for ix in range(nkernel):
+            xpos = minkernel + ix * dx
+            for iy in range(nkernel):
+                ypos = minkernel + iy * dy
+                for iz in range(nkernel):
+                    zpos = minkernel + iz * dz
+                    v = self.Gaussian3D(xpos, ypos, zpos, microscopePSFWidth)
+                    psf[ix, iy, iz] = v
+                    sum = sum + v
+        # Normalize
+        psf = psf / sum
+        # Convolves PSF for each DSB position
+        for iDsb in range(len(self.DSBPositions)):
+            idx = int(np.floor((self.DSBPositions[iDsb][0] - xmin) / dx + 1e-14))
+            idy = int(np.floor((self.DSBPositions[iDsb][1] - xmin) / dy + 1e-14))
+            idz = int(np.floor((self.DSBPositions[iDsb][2] - xmin) / dz + 1e-14))
+            startx = int(idx - halfsize)
+            starty = int(idy - halfsize)
+            startz = int(idz - halfsize)
+            if startx < 0:
+                startx = 0
+            if starty < 0:
+                starty = 0
+            if startz < 0:
+                startz = 0
+            endx = int(idx + halfsize)
+            endy = int(idy + halfsize)
+            endz = int(idz + halfsize)
+            if endx > nx:
+                endx = nx
+            if endy > ny:
+                endy = ny
+            if endz > nz:
+                endz = nz
+            for i in range(startx, endx):
+                for j in range(starty, endy):
+                    for k in range(startz, endz):
+                        img3d[i, j, k] = img3d[i, j, k] + psf[i - startx, j - starty, k - startz]
+        x = []
+        y = []
+        z = []
+        v = []
+        for i in range(nx):
+            for j in range(ny):
+                for k in range(nz):
+                    x.append(i)
+                    y.append(j)
+                    z.append(k)
+                    v.append(img3d[i,j,k])
+        x = np.array(x)
+        y = np.array(y)
+        z = np.array(z)
+        v = np.array(v)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_title('')
+        img = ax.scatter(x, y, z, c=v, cmap='MyColorMapAlpha', marker='s', s=20)
+        fig.colorbar(img)
+        plt.show()
+
+    def produce2DImages(self, microscopePSFWidth = 0.8, resolution = 0.1, xmin = -5, xmax = 5, ymin = -5, ymax = 5):
+        halfSize = int(np.floor(3*microscopePSFWidth / resolution))
+        if halfSize < 3:
+            halfSize = 3
+        nkernel = 2 * halfSize + 1
+        psf = np.zeros([nkernel, nkernel])
+        minkernel = -halfSize * resolution
+        sum = 0
+        for ix in range(nkernel):
+            xpos = minkernel + ix * resolution
+            for iy in range(nkernel):
+                ypos = minkernel + iy * resolution
+                v = self.Gaussian2D(xpos, ypos, microscopePSFWidth)
+                psf[ix, iy] = v
+                sum = sum + v
+        psf = psf / sum
+        fig = plt.figure()
+        # Different planes (0,1), (0,2) and (1,2)
+        ids1 = [0, 0, 1]
+        ids2 = [1, 2, 2]
+        pos = [131, 132, 133]
+        titles = ['Z-plane', 'Y-plane', 'X-plane']
+        xaxislbl = [r'x ($\mu$m)', r'x ($\mu$m)', r'y ($\mu$m)']
+        yaxislbl = [r'y ($\mu$m)', r'z ($\mu$m)', r'z ($\mu$m)']
+        for id in range(len(ids1)):
+            dx = resolution
+            dy = resolution
+            nx = int(np.floor((xmax - xmin) / dx + 1e-14) + 1)
+            ny = int(np.floor((ymax - ymin) / dy + 1e-14) + 1)
+            img2d = np.zeros([nx, ny])
+            for iDsb in range(len(self.DSBPositions)):
+                idx = int(np.floor((self.DSBPositions[iDsb][ids1[id]] - xmin)) / dx + 1e-14)
+                idy = int(np.floor((self.DSBPositions[iDsb][ids2[id]] - ymin)) / dy + 1e-14)
+                startx = int(idx - halfSize)
+                starty = int(idy - halfSize)
+                if startx < 0:
+                    startx = 0
+                if starty < 0:
+                    starty = 0
+                endx = int(idx + halfSize)
+                endy = int(idy + halfSize)
+                if endx > nx:
+                    endx = nx
+                if endy > ny:
+                    endy = ny
+                for i in range(startx, endx):
+                    for j in range(starty, endy):
+                        img2d[i, j] = img2d[i, j] + psf[i - startx, j - starty]
+            ax = fig.add_subplot(pos[id])
+            ax.imshow(img2d, cmap='MyColorMapAlpha', extent=[xmin, xmax, ymin, ymax], origin='lower')
+            ax.set_title(titles[id])
+            #ax.set_xticks([j for j in np.linspace(xmin, xmax, 5)])
+            #ax.set_yticks([j for j in np.linspace(ymin, ymax, 5)])
+            ax.set_xlabel(xaxislbl[id])
+            ax.set_ylabel(yaxislbl[id])
+            ax.set_aspect('equal')
+        plt.show()
+
+    def Gaussian3D(self, x, y, z, sigma):
+        return np.exp(-(x ** 2 + y ** 2 + z ** 2) / (2 * sigma ** 2))
+
+    def Gaussian2D(self, x, y, sigma):
+        return np.exp(-(x ** 2 + y ** 2) / (2 * sigma ** 2))
+
+    def SetUpColorMap(self):
+        ncolors = 256
+        color_array = plt.get_cmap('Reds')(range(ncolors))
+        color_array[:, -1] = np.linspace(0.01, 0.99, ncolors)
+        map_object = LinearSegmentedColormap.from_list(name='MyColorMapAlpha', colors=color_array)
+        plt.register_cmap(cmap=map_object)
 
 class DamageSite:
     def __init__(self):
@@ -264,6 +537,10 @@ class DamageSite:
             damage['subcomponent'] = int(v[i*3])
             damage['basepairID'] = int(v[i*3+1])
             damage['type'] = int(v[i*3+2])
+            if damage['type'] == 4:
+                damage['type'] = 1
+            if damage['type'] == 5:
+                damage['type'] = 3
             self.individualdamages.append(damage)
 
     @property
