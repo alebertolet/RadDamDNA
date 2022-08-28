@@ -81,7 +81,6 @@ class DamageToDNA:
                     self.damageMap[iCh][iBp] = {}
                     self.damagePositions[iCh][iBp] = {}
                 self.damageMap[iCh][damage.initialBp+bpdamage['basepairID']][bpdamage['subcomponent']] = bpdamage['type']
-                print(bpdamage)
                 self.damagePositions[iCh][damage.initialBp+bpdamage['basepairID']][bpdamage['subcomponent']] = [damage.centerX, damage.centerY, damage.centerZ]
             if damage.newExposure > 1:
                 iExposure += 1
