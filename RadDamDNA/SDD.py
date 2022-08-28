@@ -25,6 +25,9 @@ class DamageToDNA:
         self.damagePositions = {}
         self.Darray = []
         self.DSBarray = []
+        self.SSBarray = []
+        self.SBarray = []
+        self.BDarray = []
         self.DSBPositions = []
 
     def initializeCounters(self):
@@ -86,6 +89,9 @@ class DamageToDNA:
                 self.Darray.append(self.accumulateDose)
                 self.computeStrandBreaks()
                 self.DSBarray.append(self.numDSB)
+                self.SSBarray.append(self.numSSB)
+                self.SBarray.append(self.numSB)
+                self.BDarray.append(self.numBD)
                 if getVideo:
                     self.produce3DImage(show=False)
 
@@ -572,15 +578,27 @@ class DamageToDNA:
         print("DSB positions", len(self.DSBPositions))
         print("Number of foci", self.getNumberOfFoci(0.5))
 
-    def plotDoseResponseCurve(self):
+    def plotDoseResponseCurve(self, q = 'dsb'):
+        if q.lower() == 'dsb':
+            y = self.DSBarray
+            ylabel = 'DSB'
+        elif q.lower() == 'ssb':
+            y = self.SSBarray
+            ylabel = 'SSB'
+        elif q.lower() == 'sb':
+            y = self.SBarray
+            ylabel = 'SB'
+        elif q.lower() == 'bd':
+            y = self.BDarray
+            ylabel = 'BD'
         fig = plt.figure()
         fig.set_size_inches((4, 4))
         ax = fig.add_subplot(111)
-        ax.plot(self.Darray, self.DSBarray)
+        ax.plot(self.Darray, y)
         ax.set_xlim(0, None)
         ax.set_ylim(0, None)
         ax.set_xlabel('Dose (Gy)')
-        ax.set_ylabel('DSB')
+        ax.set_ylabel(ylabel)
         ax.grid()
         fig.tight_layout()
         plt.show()

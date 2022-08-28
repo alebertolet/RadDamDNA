@@ -20,7 +20,7 @@ for i in neworder:
 damage.populateDamages(getVideo=False)
 damage.computeStrandBreaks()
 damage.printDamageCount()
-damage.plotDoseResponseCurve()
+damage.plotDoseResponseCurve('SSB')
 #damage.produce3DImage()
 #damage.produce2DImages()
 
