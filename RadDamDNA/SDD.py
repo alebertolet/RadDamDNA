@@ -11,6 +11,7 @@ import random
 import matplotlib.pyplot as plt
 from scipy import interpolate
 from matplotlib.colors import LinearSegmentedColormap
+import os
 
 class DamageToDNA:
     def __init__(self):
@@ -60,9 +61,13 @@ class DamageToDNA:
             dsite.initialBp = np.round(dsite.ChromosomePosition * self.Chromosomesizes[dsite.chromosomeNumber]*1e6)
             self.damageSites.append(dsite)
 
-    def populateDamages(self):
+    def populateDamages(self, getVideo=True):
         # Key of damage map is the chromosome number
         iExposure = -1
+        if getVideo:
+            d = os.getcwd() + '/RadDamDNA/video/'
+            for f in os.listdir(d):
+                os.remove(os.path.join(d, f))
         for damage in self.damageSites:
             iCh = damage.chromosomeNumber
             if iCh not in self.damageMap.keys():
@@ -81,6 +86,8 @@ class DamageToDNA:
                 self.Darray.append(self.accumulateDose)
                 self.computeStrandBreaks()
                 self.DSBarray.append(self.numDSB)
+                if getVideo:
+                    self.produce3DImage(show=False)
 
     def computeStrandBreaks(self):
         DSBMap = {}
@@ -302,7 +309,7 @@ class DamageToDNA:
     def getDistance(self, a, b):
         return np.sqrt(np.sum(np.power(a-b, 2)))
 
-    def produce3DImage(self, microscopePSFWidth = 0.4, resolution = 0.4, xmin = -5, xmax = 5, ymin = -5, ymax = 5, zmin = -5, zmax = 5):
+    def produce3DImage(self, show=True, microscopePSFWidth = 0.4, resolution = 0.4, xmin = -5, xmax = 5, ymin = -5, ymax = 5, zmin = -5, zmax = 5):
         dx = resolution
         dy = resolution
         dz = resolution
@@ -373,10 +380,15 @@ class DamageToDNA:
         v = np.array(v)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.set_title('')
+        ax.set_title('Dose = ' + str(np.round(self.accumulateDose, 2)) + ' Gy')
         img = ax.scatter(x, y, z, c=v, cmap='MyColorMapAlpha', marker='s', s=20)
         fig.colorbar(img)
-        plt.show()
+        if show:
+            plt.show()
+        else:
+            d = os.getcwd() + '/RadDamDNA/video/'
+            nfiles = len(os.listdir(d))
+            plt.savefig(d + str(nfiles) + '.png')
 
     def produce2DImages(self, microscopePSFWidth = 0.8, resolution = 0.1, xmin = -5, xmax = 5, ymin = -5, ymax = 5):
         halfSize = int(np.floor(3*microscopePSFWidth / resolution))
