@@ -132,3 +132,4 @@ dmypy.json
 /RadDamDNA/.idea/
 .idea/
 .DS_Store
+/test.sdd
