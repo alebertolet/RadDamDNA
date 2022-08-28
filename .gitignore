@@ -128,3 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /RadDamDNA/video/
+/RadDamDNA/video/*
+.idea/
+.DS_Store
