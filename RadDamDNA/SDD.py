@@ -37,7 +37,7 @@ class DamageToDNA:
         self.numBD = 0; self.numBDDirect = 0; self.numBDIndirect = 0
         self.numSSBPlus = 0; self.numDSBPlus = 0; self.numDSBComplex = 0
 
-    def readSDDAndDose(self, path, namessd = 'DNADamage_sdd.txt', namephsp = 'DNADamage.phsp'):
+    def readSDDAndDose(self, path, namessd = 'DNADamage_sdd.txt', namephsp = 'DNADamage.phsp', defectiveChromosomeNumber=False):
         if namephsp is not None:
             dosepath = path + namephsp
             f = open(dosepath, 'r')
@@ -46,18 +46,18 @@ class DamageToDNA:
                 split = l.split()
                 self.doses = np.append(self.doses, float(split[1]))
         sddpath = path + namessd
-        self.readFromSDD(sddpath)
+        self.readFromSDD(sddpath, defectiveChromosomeNumber)
         f.close()
         self.namessd = namessd
         self.namephsp = namephsp
 
-    def readFromSDD(self, path):
+    def readFromSDD(self, path, dcn=False):
         reader = SDDReader(path)
         for key in reader.headerProperties:
             setattr(self, key.replace("/", "_"), reader.headerProperties[key])
         self.nbpForDSB = int(self.Damagedefinition[2])
         for d in reader.damages:
-            dsite = DamageSite()
+            dsite = DamageSite(dcn)
             for key in d:
                 setattr(dsite, key, d[key])
             dsite.initialBp = np.round(dsite.ChromosomePosition * self.Chromosomesizes[dsite.chromosomeNumber]*1e6)
@@ -779,8 +779,9 @@ class DamageToDNA:
         plt.register_cmap(cmap=map_object)
 
 class DamageSite:
-    def __init__(self):
+    def __init__(self, defectiveChromosomeNumber=False):
         self.initialBp = 0
+        self.defectiveChromosomeNumber = defectiveChromosomeNumber
 
     def PrintProperties(self):
         temp = vars(self)
@@ -822,7 +823,10 @@ class DamageSite:
     def ChromosomeID(self, v):
         self._chromosomeID = v
         self.typeOfChromatine = int(v[0])
-        self.chromosomeNumber = int(v[1])-1  ### -1 IS FOR THE OLD VERSION OF THE SCORER; THIS HAS BEEN CORRECTED
+        if self.defectiveChromosomeNumber:
+            self.chromosomeNumber = int(v[1])-1  ### -1 IS FOR THE OLD VERSION OF THE SCORER; THIS HAS BEEN CORRECTED
+        else:
+            self.chromosomeNumber = int(v[1])
         self.chromatideNumber = int(v[2])
         self.chromosomeArm = int(v[3])
 

@@ -15,7 +15,7 @@ neworder = random.sample(range(225), 150)
 #neworder = [0, 1]
 for i in neworder:
     path = basepath + str(i) + '/'
-    damage.readSDDAndDose(path)
+    damage.readSDDAndDose(path, defectiveChromosomeNumber=True)
 
 damage.populateDamages(getVideo=False)
 damage.computeStrandBreaks()

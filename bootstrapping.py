@@ -12,7 +12,7 @@ import random
 
 from scipy import interpolate
 
-nboot = 20
+nboot = 50
 
 maxdose = 8.0
 Dose = np.linspace(0, maxdose, 100)
@@ -21,13 +21,16 @@ alldsbs = np.zeros([len(Dose), nboot])
 SSB = np.zeros(Dose.shape)
 BD = np.zeros(Dose.shape)
 ntries = np.zeros(Dose.shape)
-basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/proton/sims/1MeV.txt/'
+basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/proton/sims/20MeV.txt/'
 for i in range(nboot):
     damage = DamageToDNA()
-    neworder = random.sample(range(225), 225)
+    neworder = random.sample(range(300), 300)
     for j in neworder:
         path = basepath + str(j) + '/'
-        damage.readSDDAndDose(path)
+        try:
+            damage.readSDDAndDose(path, defectiveChromosomeNumber=True)
+        except:
+            pass
     damage.populateDamages(stopAtDose=maxdose)
     damage.computeStrandBreaks()
     dose, dsb = damage.getDoseResponseCurve(plot=False, q='dsb')
