@@ -10,8 +10,8 @@ from RadDamDNA.SDD import *
 import random
 
 damage = DamageToDNA()
-basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/proton/sims/1MeV.txt/'
-neworder = random.sample(range(250), 20)
+basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/alpha/sims/1MeV.txt/'
+neworder = random.sample(range(225), 150)
 #neworder = [0, 1]
 for i in neworder:
     path = basepath + str(i) + '/'
@@ -20,8 +20,9 @@ for i in neworder:
 damage.populateDamages(getVideo=False)
 damage.computeStrandBreaks()
 damage.printDamageCount()
-damage.plotDoseResponseCurve('SSB')
-damage.plotDoseResponseCurve('DSB')
+damage.getDoseResponseCurve('SSB')
+damage.getDoseResponseCurve('DSB')
+damage.getDoseResponseCurve('BD')
 #damage.produce3DImage()
 #damage.produce2DImages()
 

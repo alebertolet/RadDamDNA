@@ -63,7 +63,7 @@ class DamageToDNA:
             dsite.initialBp = np.round(dsite.ChromosomePosition * self.Chromosomesizes[dsite.chromosomeNumber]*1e6)
             self.damageSites.append(dsite)
 
-    def populateDamages(self, getVideo=False):
+    def populateDamages(self, getVideo=False, stopAtDose=-1):
         # Key of damage map is the chromosome number
         iExposure = -1
         if getVideo:
@@ -71,6 +71,8 @@ class DamageToDNA:
             for f in os.listdir(d):
                 os.remove(os.path.join(d, f))
         for damage in self.damageSites:
+            if stopAtDose > 0 and self.accumulateDose > stopAtDose:
+                break
             iCh = damage.chromosomeNumber
             if iCh not in self.damageMap.keys():
                 self.damageMap[iCh] = {}
@@ -544,6 +546,7 @@ class DamageToDNA:
         centerMaxMin.append([xmax, ymax, zmax])
         centerMaxMin.append([xmin, ymin, zmin])
         return centerMaxMin
+
     def getStringOutOfList(self, list, type='float'):
         string = ''
         for i, e in enumerate(list):
@@ -554,8 +557,6 @@ class DamageToDNA:
             if i < len(list) - 1:
                 string += ", "
         return string
-
-
 
     def printDamageCount(self):
         print("Summary of damage")
@@ -577,7 +578,7 @@ class DamageToDNA:
         print("DSB positions", len(self.DSBPositions))
         print("Number of foci", self.getNumberOfFoci(0.5))
 
-    def plotDoseResponseCurve(self, q = 'dsb'):
+    def getDoseResponseCurve(self, plot=True, q='dsb'):
         if q.lower() == 'dsb':
             y = self.DSBarray
             ylabel = 'DSB'
@@ -590,17 +591,19 @@ class DamageToDNA:
         elif q.lower() == 'bd':
             y = self.BDarray
             ylabel = 'BD'
-        fig = plt.figure()
-        fig.set_size_inches((4, 4))
-        ax = fig.add_subplot(111)
-        ax.plot(self.Darray, y)
-        ax.set_xlim(0, None)
-        ax.set_ylim(0, None)
-        ax.set_xlabel('Dose (Gy)')
-        ax.set_ylabel(ylabel)
-        ax.grid()
-        fig.tight_layout()
-        plt.show()
+        if plot:
+            fig = plt.figure()
+            fig.set_size_inches((4, 4))
+            ax = fig.add_subplot(111)
+            ax.plot(self.Darray, y)
+            ax.set_xlim(0, None)
+            ax.set_ylim(0, None)
+            ax.set_xlabel('Dose (Gy)')
+            ax.set_ylabel(ylabel)
+            ax.grid()
+            fig.tight_layout()
+            plt.show()
+        return self.Darray, y
 
     def getNumberOfFoci(self, fociSize = 0.4):
         indexIsAvailable = []
