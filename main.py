@@ -12,7 +12,7 @@ import random
 damage = DamageToDNA()
 basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/alpha/sims/1MeV.txt/'
 neworder = random.sample(range(225), 150)
-#neworder = [0, 1]
+neworder = [0, 1]
 for i in neworder:
     path = basepath + str(i) + '/'
     damage.readSDDAndDose(path, defectiveChromosomeNumber=True)
