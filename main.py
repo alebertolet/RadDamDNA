@@ -13,9 +13,10 @@ damage = DamageToDNA()
 basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/alpha/sims/1MeV.txt/'
 neworder = random.sample(range(225), 150)
 neworder = [0, 1]
-for i in neworder:
-    path = basepath + str(i) + '/'
-    damage.readSDDAndDose(path, defectiveChromosomeNumber=True)
+times = [0, 0.0000001]
+for i, e in enumerate(neworder):
+    path = basepath + str(e) + '/'
+    damage.readSDDAndDose(path, defectiveChromosomeNumber=True, particleTime=times[i])
 
 damage.populateDamages(getVideo=False)
 damage.computeStrandBreaks()
