@@ -72,6 +72,7 @@ class DamageToDNA:
             d = os.getcwd() + '/RadDamDNA/video/'
             for f in os.listdir(d):
                 os.remove(os.path.join(d, f))
+        iEvent = 0
         for damage in self.damageSites:
             if stopAtDose > 0 and self.accumulateDose > stopAtDose:
                 break
@@ -83,9 +84,10 @@ class DamageToDNA:
                 if iBp not in self.damageMap[iCh].keys():
                     self.damageMap[iCh][iBp] = {}
                 self.damageMap[iCh][damage.initialBp+bpdamage['basepairID']][bpdamage['subcomponent']] = \
-                    SubcomponentLesion(bpdamage['type'], [damage.centerX, damage.centerY, damage.centerZ], damage.LesionTime, damage.ParticleTime)
+                    SubcomponentLesion(bpdamage['type'], [damage.centerX, damage.centerY, damage.centerZ], damage.LesionTime, damage.ParticleTime, iEvent)
             if damage.newExposure > 1:
                 iExposure += 1
+                iEvent += 1
                 self.computeStrandBreaks()
                 if len(self.doses) > 0:
                     self.accumulateDose += self.doses[iExposure]
@@ -96,6 +98,8 @@ class DamageToDNA:
                     self.BDarray.append(self.numBD)
                     if getVideo:
                         self.produce3DImage(show=False)
+            if damage.newExposure == 1:
+                iEvent += 1
 
     def computeStrandBreaks(self):
         self.DSBMap = {}
@@ -543,10 +547,13 @@ class DamageToDNA:
         self.medrasBreaks = []
         self.populateDamages()
         self.computeStrandBreaks()
-        damageSitesPerTime = self.classifyDamageSites()
+        self.emptySets = 0
+        damageSitesPerEvent = self.classifyDamageSites()
         numSites = 0
         firstExposure = True
-        for damageSites in damageSitesPerTime:
+        for damageSites in damageSitesPerEvent:
+            complexity = 0
+            setDSB = 0
             newEvent = True
             for iCh in damageSites.keys():
                 ibpsTakenForThisChromosome = []
@@ -640,6 +647,7 @@ class DamageToDNA:
                     medrasbreak2 = [numSites, pos2, complexBreak, chromID[:], damageChromPos, 1, 0, lesionTime, cause]
                     self.medrasBreaks.append([medrasbreak1, medrasbreak2])
                     numSites += 1
+
         return numSites
 
     def getParticleTimes(self):
@@ -913,11 +921,12 @@ class DamageToDNA:
         plt.register_cmap(cmap=map_object)
 
 class SubcomponentLesion:
-    def __init__(self, type, position, lesiontime, particletime):
+    def __init__(self, type, position, lesiontime, particletime, eventid=0):
         self.type = type
         self.position = position
         self.lesiontime = lesiontime
         self.particletime = particletime
+        self.eventID = eventid
 
 class SDDDamageSite:
     def __init__(self, defectiveChromosomeNumber=False):
