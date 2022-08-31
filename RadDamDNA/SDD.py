@@ -371,6 +371,7 @@ class DamageToDNA:
             f.write("Energy distribution, " + self.getStringOutOfList(self.Energydistribution) + ';\n')
             f.write("Particle fraction, " + str(self.Particlefraction) + ';\n')
             f.write("Dose or fluence, " + self.getStringOutOfList(self.Doseorfluence) + ';\n')
+            f.write("Dose rate, " + str(0.0) + ';\n')
             f.write("Irradiation target, " + str(self.Irradiationtarget) + ';\n')
             f.write("Volumes, " + self.getStringOutOfList(self.Volumes) + ';\n')
             f.write("Chromosome sizes, " + self.getStringOutOfList(self.Chromosomesizes) + ';\n')
@@ -1127,6 +1128,7 @@ class SDDReader:
                     except:
                         fields.append(split[i].strip().replace(';', ''))
                 self.headerProperties[split[0].strip().replace(' ', '')] = fields
+        self.headerProperties['ScoringVolume'] = [self.headerProperties['Volumes'][7]]+list(map(float,self.headerProperties['Volumes'][8:]))
         self.dataEntries = []
         if self.headerProperties['Dataentries'][0] == 1:
             self.dataEntries.append('Classification')
