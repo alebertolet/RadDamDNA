@@ -61,11 +61,11 @@ class MedrasRepair:
         self.radialRun = False
         self.trackRun = False
 
-    def repairSimulation(self, path='', damage=None, type='Fidelity'):
+    def repairSimulation(self, path='', damage=None, type='Fidelity', recalculateDamages=True):
         summaries = []
         if damage is not None:
             self.damage = damage
-            self.damage.computeMedrasBreaks()
+            self.damage.computeMedrasBreaks(recalculateDamages)
         elif path != '':
             if path[-1] != '/':
                 path += '/'
@@ -79,18 +79,18 @@ class MedrasRepair:
                 self.damage.readFromSDD(filePath)
                 self.damage.computeMedrasBreaks()
                 # Find matching method and run
-                for name in self.analysisFunctions.keys():
-                    if type == name:
-                        summaries.append(self.analysisFunctions[name]())
-                if len(summaries) == 0:
-                    print('Did not find matching analysis function. Options are:')
-                    print(', '.join(f[0] for f in self.analysisFunctions))
-                    return
-                if len(summaries) == 0:
-                    print('No output returned!')
-                    return
         else:
             print('Neither a valid path or damage object were provided!')
+            return
+        for name in self.analysisFunctions.keys():
+            if type == name:
+                summaries.append(self.analysisFunctions[name]())
+        if len(summaries) == 0:
+            print('Did not find matching analysis function. Options are:')
+            print(', '.join(f[0] for f in self.analysisFunctions))
+            return
+        if len(summaries) == 0:
+            print('No output returned!')
             return
         if summaries[0] is not None:
             for summary in summaries:

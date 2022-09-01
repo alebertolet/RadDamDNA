@@ -5,11 +5,9 @@ Created on 8/28/22 7:59 PM
 
 @author: alejandrobertolet
 """
-import numpy as np
 
-from RadDamDNA.SDD import *
+from RadDamDNA.damage import *
 import random
-
 from scipy import interpolate
 
 nboot = 100

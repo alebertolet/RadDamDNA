@@ -369,7 +369,10 @@ class DamageToDNA:
             f.write("Simulation Details, " + str(self.SimulationDetails) + ';\n')
             f.write("Source, " + str(self.Source) + ';\n')
             f.write("Source type, " + str(int(self.Sourcetype)) + ';\n')
-            f.write("Incident particles, " + str(int(self.Incidentparticles))  + ';\n')
+            if self.Incidentparticles != '':
+                f.write("Incident particles, " + str(int(self.Incidentparticles))  + ';\n')
+            else:
+                f.write("Incident particles, " + str(self.Incidentparticles) + ';\n')
             f.write("Mean particle energy, " + str(self.Meanparticleenergy)  + ';\n')
             f.write("Energy distribution, " + self.getStringOutOfList(self.Energydistribution) + ';\n')
             f.write("Particle fraction, " + str(self.Particlefraction) + ';\n')
@@ -542,10 +545,11 @@ class DamageToDNA:
                         f.write('\n')
         return numSites
 
-    def computeMedrasBreaks(self):
+    def computeMedrasBreaks(self, recalculateDamage=True):
         self.medrasBreaks = []
-        self.populateDamages()
-        self.computeStrandBreaks()
+        if recalculateDamage:
+            self.populateDamages()
+            self.computeStrandBreaks()
         self.emptySets = 0
         self.complexities = []
         damageSitesPerEvent = self.classifyDamageSites()
@@ -639,7 +643,7 @@ class DamageToDNA:
                         firstExposure = False
                     chromosomeLength = self.Chromosomesizes[iCh]
                     damageChromPos = initialBpId / chromosomeLength / 1e6
-                    chromID = [iCh, 1, 0]
+                    chromID = [1, iCh, 1, 0]
                     typedamage = 0
                     if dir == 0 and indir > 0:
                         typedamage = 1

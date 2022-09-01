@@ -6,7 +6,7 @@ Created on 8/16/22 11:25 AM
 @author: alejandrobertolet
 """
 
-from RadDamDNA.SDD import *
+from RadDamDNA.damage import *
 import random
 
 damage = DamageToDNA()
