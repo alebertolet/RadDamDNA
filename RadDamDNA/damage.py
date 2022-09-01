@@ -72,7 +72,7 @@ class DamageToDNA:
             for f in os.listdir(d):
                 os.remove(os.path.join(d, f))
         iEvent = 0
-        for damage in self.damageSites:
+        for id, damage in enumerate(self.damageSites):
             if stopAtDose > 0 and self.accumulateDose > stopAtDose:
                 break
             iCh = damage.chromosomeNumber
@@ -84,7 +84,7 @@ class DamageToDNA:
                     self.damageMap[iCh][iBp] = {}
                 self.damageMap[iCh][damage.initialBp+bpdamage['basepairID']][bpdamage['subcomponent']] = \
                     SubcomponentLesion(bpdamage['type'], [damage.centerX, damage.centerY, damage.centerZ], damage.LesionTime, damage.ParticleTime, iEvent)
-            if damage.newExposure > 1:
+            if (id < len(self.damageSites) - 1 and self.damageSites[id + 1].newExposure > 1) or id == len(self.damageSites) - 1:
                 iExposure += 1
                 iEvent += 1
                 self.computeStrandBreaks()
@@ -782,7 +782,8 @@ class DamageToDNA:
     def getDistance(self, a, b):
         return np.sqrt(np.sum(np.power(a-b, 2)))
 
-    def produce3DImage(self, show=True, microscopePSFWidth = 0.4, resolution = 0.4, xmin = -5, xmax = 5, ymin = -5, ymax = 5, zmin = -5, zmax = 5):
+    def produce3DImage(self, show=True, microscopePSFWidth = 0.4, resolution = 0.4, xmin = -5, xmax = 5, ymin = -5, ymax = 5, zmin = -5, zmax = 5,
+                       indQuantity='Dose', indValueString=''):
         dx = resolution
         dy = resolution
         dz = resolution
@@ -853,7 +854,12 @@ class DamageToDNA:
         v = np.array(v)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.set_title('Dose = ' + str(np.round(self.accumulateDose, 2)) + ' Gy')
+        if indQuantity == 'Dose':
+            ax.set_title('Dose = ' + str(np.round(self.accumulateDose, 2)) + ' Gy')
+        elif indValueString == '':
+            ax.set_title()
+        else:
+            ax.set_title(indQuantity + ' = ' + indValueString)
         img = ax.scatter(x, y, z, c=v, cmap='MyColorMapAlpha', marker='s', s=20)
         fig.colorbar(img)
         if show:

@@ -9,21 +9,28 @@ Created on 8/28/22 7:59 PM
 from RadDamDNA.damage import *
 import random
 from scipy import interpolate
+import pickle
 
-nboot = 100
+nboot = 50
 
-maxdose = 6.0
+maxdose = 8.0
 
 base = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/'
-particles = ['proton', 'proton', 'proton', 'proton', 'proton', 'proton', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha']#, 'xray']
-energies = ['20MeV', '10MeV', '5MeV', '2MeV', '1MeV', '0.8MeV', '8MeV', '6MeV', '4MeV', '2MeV', '1MeV']#, '250keV']
-c = ['slategray', 'skyblue', 'blue', 'green', 'olive', 'orange', 'peru', 'brown', 'salmon', 'red', 'darkred']
+particles = ['xray', 'proton', 'proton', 'proton', 'proton', 'proton', 'proton', 'proton', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha']
+energies = ['250keV', '100MeV', '20MeV', '10MeV', '5MeV', '2MeV', '1MeV', '0.8MeV', '8MeV', '6MeV', '4MeV', '2MeV', '1MeV']
+c = ['black', 'gray', 'slategray', 'skyblue', 'blue', 'green', 'olive', 'orange', 'peru', 'brown', 'salmon', 'red', 'darkred']
+particles.reverse()
+energies.reverse()
+c.reverse()
 
+data = {}
 fig = plt.figure()
 fig.set_size_inches((12, 12))
 ax = fig.add_subplot(111)
 # Loop over all particles and energies specified above
 for ip, e in enumerate(energies):
+    identifier = particles[ip] + '/' + e
+    data[identifier] = {}
     basepath = base + particles[ip] + '/sims/' + e + '.txt/'
     nfiles = len(os.listdir(basepath))
     #Section to get what directories actually contains both dose and SDD. Disregard others!
@@ -35,7 +42,7 @@ for ip, e in enumerate(energies):
             if 'DNADamage_sdd.txt' in files and 'DNADamage.phsp' in files:
                 if os.path.getsize(newpath + 'DNADamage_sdd.txt') > 0: #only those with actual data
                     listOfAvailableDirs.append(j)
-    print(particles[ip], e, len(listOfAvailableDirs))
+    print(identifier, str(int(ip/len(energies)*100)) + '%...')
     # Preparing arrays
     Dose = np.linspace(0, maxdose, 100)
     DSB = np.zeros(Dose.shape)
@@ -54,6 +61,7 @@ for ip, e in enumerate(energies):
 
         damage.populateDamages(stopAtDose=maxdose)
         damage.computeStrandBreaks()
+        #damage.printDamageCount()
         dose, dsb = damage.getDoseResponseCurve(plot=False, q='dsb')
         dose, ssb = damage.getDoseResponseCurve(plot=False, q='ssb')
         dose, bd = damage.getDoseResponseCurve(plot=False, q='bd')
@@ -83,14 +91,23 @@ for ip, e in enumerate(energies):
     stddsb = np.sqrt(vardsb)
 
     DSB = DSB / ntries
-    SSB = DSB / ntries
+    SSB = SSB / ntries
     BD = BD / ntries
+
+    data[identifier]['Dose'] = Dose
+    data[identifier]['DSB'] = DSB
+    data[identifier]['SSB'] = SSB
+    data[identifier]['BD'] = BD
 
     ax.plot(Dose, DSB, '-', label=particles[ip]+'-'+e, color=c[ip])
     ax.fill_between(Dose, DSB-stddsb, DSB+stddsb, color=c[ip], alpha=0.15)
     ax.set_xlabel('Dose (Gy)')
     ax.set_ylabel('DSB')
     fig.tight_layout()
+
+picklefile = '/Users/ai925/source/workspace/repair/yieldData.pickle'
+with open(picklefile, 'wb') as handle:
+    pickle.dump(data, handle)
 
 ax.grid()
 ax.set_xlim(0, 1.01*maxdose)
