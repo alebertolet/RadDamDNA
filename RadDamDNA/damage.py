@@ -629,7 +629,7 @@ class DamageToDNA:
                         ibpsTakenForThisChromosome.append(initialBpId + j)
                     if dsb == 0:
                         break
-                    if dsb + sb + bd > 2:
+                    if dsb + sb - 2 * dsb + bd > 2:
                         complexBreak = True
                         complexity += 1
                     else:

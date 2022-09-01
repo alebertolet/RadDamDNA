@@ -47,6 +47,8 @@ for ip, e in enumerate(energies):
     Dose = np.linspace(0, maxdose, 100)
     DSB = np.zeros(Dose.shape)
     alldsbs = np.zeros([len(Dose), nboot])
+    allssbs = np.zeros([len(Dose), nboot])
+    allbds = np.zeros([len(Dose), nboot])
     SSB = np.zeros(Dose.shape)
     BD = np.zeros(Dose.shape)
     ntries = np.zeros(Dose.shape)
@@ -81,14 +83,22 @@ for ip, e in enumerate(energies):
                 DSB[id] += fdsb(d)
                 alldsbs[id, i] = fdsb(d)
                 SSB[id] += fssb(d)
+                allssbs[id, i] = fssb(d)
                 BD[id] += fbd(d)
+                allbds[id, i] = fbd(d)
                 ntries[id] += 1
 
     vardsb = np.zeros(Dose.shape)
+    varssb = np.zeros(Dose.shape)
+    varbd = np.zeros(Dose.shape)
     for j in range(alldsbs.shape[0]):
-        vardsb[j] = np.var(alldsbs[j,:])
+        vardsb[j] = np.var(alldsbs[j, :])
+        varssb[j] = np.var(allssbs[j, :])
+        varbd[j] = np.var(allbds[j, :])
 
     stddsb = np.sqrt(vardsb)
+    stdssb = np.sqrt(varssb)
+    stdbd = np.sqrt(varbd)
 
     DSB = DSB / ntries
     SSB = SSB / ntries
@@ -98,6 +108,9 @@ for ip, e in enumerate(energies):
     data[identifier]['DSB'] = DSB
     data[identifier]['SSB'] = SSB
     data[identifier]['BD'] = BD
+    data[identifier]['stdDSB'] = stddsb
+    data[identifier]['stdSSB'] = stdssb
+    data[identifier]['stdBD'] = stdbd
 
     ax.plot(Dose, DSB, '-', label=particles[ip]+'-'+e, color=c[ip])
     ax.fill_between(Dose, DSB-stddsb, DSB+stddsb, color=c[ip], alpha=0.15)
