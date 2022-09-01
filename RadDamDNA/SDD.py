@@ -548,6 +548,7 @@ class DamageToDNA:
         self.populateDamages()
         self.computeStrandBreaks()
         self.emptySets = 0
+        self.complexities = []
         damageSitesPerEvent = self.classifyDamageSites()
         numSites = 0
         firstExposure = True
@@ -555,6 +556,7 @@ class DamageToDNA:
             complexity = 0
             setDSB = 0
             newEvent = True
+            self.medrasBreaks.append([])
             for iCh in damageSites.keys():
                 ibpsTakenForThisChromosome = []
                 for i in range(len(damageSites[iCh])):
@@ -586,12 +588,14 @@ class DamageToDNA:
                                             dir += 1
                                             sb += 1
                                             dsb += 1
+                                            setDSB += 1
                                             pos1 = self.damageMap[iCh][initialBpId + j][2].position
                                             lesionTime = self.damageMap[iCh][initialBpId + j][2].lesiontime
                                         if self.DSBMap[iCh][initialBpId + j][1].type == 2:
                                             indir += 1
                                             sb += 1
                                             dsb += 1
+                                            setDSB += 1
                                             pos1 = self.damageMap[iCh][initialBpId + j][2].position
                                             lesionTime = self.damageMap[iCh][initialBpId + j][2].lesiontime
                                     if 2 in self.DSBMap[iCh][initialBpId + j].keys():
@@ -624,6 +628,7 @@ class DamageToDNA:
                         break
                     if dsb + sb + bd > 2:
                         complexBreak = True
+                        complexity += 1
                     else:
                         complexBreak = False
                     newExposureFlag = 0
@@ -645,9 +650,15 @@ class DamageToDNA:
                     # Break is: index, position, complexity, chromosome ID, upstream/downstream, new event status, time and cause
                     medrasbreak1 = [numSites, pos1, complexBreak, chromID[:], damageChromPos, -1, newExposureFlag, lesionTime, cause]
                     medrasbreak2 = [numSites, pos2, complexBreak, chromID[:], damageChromPos, 1, 0, lesionTime, cause]
-                    self.medrasBreaks.append([medrasbreak1, medrasbreak2])
+                    self.medrasBreaks[-1] += [medrasbreak1, medrasbreak2]
                     numSites += 1
-
+            self.complexities.append(complexity)
+            if setDSB < 1:
+                self.medrasBreaks.pop()
+                self.complexities.pop()
+                self.emptySets += 1
+        complexFrac = [1.0 * c / (len(b) / 2.0) for c,b in zip(self.complexities, self.medrasBreaks)]
+        self.meanComplexity = np.mean(complexFrac)
         return numSites
 
     def getParticleTimes(self):
