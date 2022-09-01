@@ -18,7 +18,7 @@ haveDisplay = "DISPLAY" in os.environ
 if not haveDisplay:
 	matplotlib.use('Agg')
 import re
-from RadDamDNA.SDD import DamageToDNA
+from RadDamDNA.damage import DamageToDNA
 
 class MedrasRepair:
     def __init__(self, sigma=0.04187, maxExposures=1000, repeats=50, minMisrepSize=0, writeKinetics=True, writeAllKinetics=False,
@@ -61,30 +61,36 @@ class MedrasRepair:
         self.radialRun = False
         self.trackRun = False
 
-    def repairSimulation(self, path, type='Fidelity'):
+    def repairSimulation(self, path='', damage=None, type='Fidelity'):
         summaries = []
-        if path[-1] != '/':
-            path += '/'
-        fileNames = os.listdir(path)
-        self.__sortNicely(fileNames)
-        filePaths = [path + f for f in fileNames]
-        for filePath in filePaths:
-            if os.path.isdir(filePath) or (filePath[-7:] != 'sdd.txt' and filePath[-3:] != 'sdd'):
-                continue
-            self.damage = DamageToDNA()
-            self.damage.readFromSDD(filePath)
+        if damage is not None:
+            self.damage = damage
             self.damage.computeMedrasBreaks()
-            breaks = self.damage.medrasBreaks
-            # Find matching method and run
-            for name in self.analysisFunctions.keys():
-                if type == name:
-                    summaries.append(self.analysisFunctions[name]())
-            if len(summaries) == 0:
-                print('Did not find matching analysis function. Options are:')
-                print(', '.join(f[0] for f in self.analysisFunctions))
-                return
-        if len(summaries) == 0:
-            print('No output returned!')
+        elif path != '':
+            if path[-1] != '/':
+                path += '/'
+            fileNames = os.listdir(path)
+            self.__sortNicely(fileNames)
+            filePaths = [path + f for f in fileNames]
+            for filePath in filePaths:
+                if os.path.isdir(filePath) or (filePath[-7:] != 'sdd.txt' and filePath[-3:] != 'sdd'):
+                    continue
+                self.damage = DamageToDNA()
+                self.damage.readFromSDD(filePath)
+                self.damage.computeMedrasBreaks()
+                # Find matching method and run
+                for name in self.analysisFunctions.keys():
+                    if type == name:
+                        summaries.append(self.analysisFunctions[name]())
+                if len(summaries) == 0:
+                    print('Did not find matching analysis function. Options are:')
+                    print(', '.join(f[0] for f in self.analysisFunctions))
+                    return
+                if len(summaries) == 0:
+                    print('No output returned!')
+                    return
+        else:
+            print('Neither a valid path or damage object were provided!')
             return
         if summaries[0] is not None:
             for summary in summaries:
