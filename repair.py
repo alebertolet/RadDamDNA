@@ -12,8 +12,8 @@ import random
 
 maxdose = 2.0
 base = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/'
-particles = ['xray']
-energies = ['250keV']
+particles = ['proton']
+energies = ['10MeV']
 for ip, e in enumerate(energies):
     basepath = base + particles[ip] + '/sims/' + e + '.txt/'
     nfiles = len(os.listdir(basepath))
@@ -35,7 +35,8 @@ for ip, e in enumerate(energies):
     damage.populateDamages(stopAtDose=maxdose)
     damage.computeStrandBreaks()
     damage.printDamageCount()
-    damage.writeSDD('/Users/ai925/source/workspace/repair/250keV_' + str(maxdose) + 'Gy_5.sdd')
+    damage.writeSDD('/Users/ai925/source/workspace/repair/proton_10MeV_' + str(maxdose) + 'Gy_0.sdd')
 
-    repair = MedrasRepair()
-    repair.repairSimulation(damage=damage, recalculateDamages=False)
+    repair = MedrasRepair(damage=damage)
+    repair.setVideoForOneEvent(recalculateDamages=False)
+    #repair.repairSimulation(recalculateDamages=False)

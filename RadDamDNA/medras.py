@@ -21,7 +21,7 @@ import re
 from RadDamDNA.damage import DamageToDNA
 
 class MedrasRepair:
-    def __init__(self, sigma=0.04187, maxExposures=1000, repeats=50, minMisrepSize=0, writeKinetics=True, writeAllKinetics=False,
+    def __init__(self,  damage=None, sigma=0.04187, maxExposures=1000, repeats=50, minMisrepSize=0, writeKinetics=True, writeAllKinetics=False,
                  addFociDelay=True, kineticLimit=25, doPlot=False, allFragments=False, listAcentrics=False, simulationLimit=24):
         '''
         :param sigma: Misrepair range, as function of nuclear radius
@@ -37,6 +37,7 @@ class MedrasRepair:
         :param listAcentrics: List acentric aberrations
         :param simulationLimit: Hours, time at which to simulate misrepair
         '''
+        self.damage = damage
         self.sigma = sigma
         self.maxExposures = maxExposures
         self.repeats = repeats
@@ -61,10 +62,9 @@ class MedrasRepair:
         self.radialRun = False
         self.trackRun = False
 
-    def repairSimulation(self, path='', damage=None, type='Fidelity', recalculateDamages=True):
+    def repairSimulation(self, path='', type='Fidelity', recalculateDamages=True):
         summaries = []
-        if damage is not None:
-            self.damage = damage
+        if self.damage is not None:
             self.damage.computeMedrasBreaks(recalculateDamages)
         elif path != '':
             if path[-1] != '/':
@@ -147,6 +147,55 @@ class MedrasRepair:
             summary += '\t\t\t'
             summary += self.summarizeKinetics(outputTimes)
         return summary
+
+    def setVideoForOneEvent(self, finalTime=np.inf, recalculateDamages=True):
+        calcMR = MisrepairCalculator()
+        if self.damage is not None:
+            self.damage.computeMedrasBreaks(recalculateDamages)
+        for n, breakList in enumerate(self.damage.medrasBreaks):
+            scaledSigma = self.sigma * stats.gmean(self.damage.ScoringVolume[1:4])
+            misrepairedPairs, repairEvents, remBreaks = calcMR.singleRepair(breakList.copy(), scaledSigma, finalTime)
+            times = np.concatenate((np.linspace(0, 1, 13), np.linspace(1.25, 4, 12), np.linspace(5, 24, 20)))
+            misrepairedBreaks = []
+            for m in misrepairedPairs:
+                misrepairedBreaks.append(m[0])
+                misrepairedBreaks.append(m[1])
+            for it in range(1, len(times)):
+                eventsInThisTime = []
+                for e in repairEvents:
+                    timeEv = e[0]
+                    if timeEv >= times[it - 1] and timeEv < times[it]:
+                        eventsInThisTime.append(e)
+                for e in eventsInThisTime:
+                    endOne = e[1]
+                    endTwo = e[2]
+                    breakOne = self.damage.medrasBreaks[n][endOne]
+                    breakTwo = self.damage.medrasBreaks[n][endTwo]
+                    if breakOne not in misrepairedBreaks or breakTwo not in misrepairedBreaks:
+                        pos1 = np.array(breakOne[1])
+                        pos2 = np.array(breakTwo[1])
+                        pos = np.array((pos1 + pos2) / 2)
+                        newdsbpos = []
+                        for p in self.damage.DSBPositions:
+                            if not np.array_equal(p, pos):
+                                print(p, pos)
+                                newdsbpos.append(p)
+                        print(times[it-1], times[it], e, 'pre', len(self.damage.DSBPositions))
+                        self.damageDSBPositions = newdsbpos
+                        print(times[it-1], times[it], e, 'post', len(self.damage.DSBPositions))
+
+                    #print(times[it-1], times[it], e, breakOne, breakTwo)
+                    # endone and endtwo are indexes in breaklist, which can be accessed as self.damage.medrasbreaks[n]
+                    # misrepairedPairs include ends that will not ever be repaired. can be accessed as misrepairedPairs[i][0] and misrepairedPairs[i][1] (these are the same as self.damage.medrasbreaks[n])
+                    # remember a break in medras format is given by 'index', 'position', 'comlpexitiy', 'chromID', damagecrhompos... (not relevant from here)
+
+        # idea: for each time in repair events, get the repaired dsb and remove them from the
+        # list of dsbs in damagetodna class. Create then a 3D picture using the methods there and
+        # eventually a video. To do this, damage.DNAPositions needs to be changed. This is an array
+        # with the mean position of the DSB. We can calculate that using something like
+        # posSB1 = np.array(self.damageMap[iCh][closestPosInStrand1][2].position)
+        # posSB2 = np.array(self.damageMap[iCh][iBp+i2][3].position)
+        # self.DSBPositions.append((posSB1 + posSB2)/2)
 
     def misrepairSpectrum(self):
         calcMR = MisrepairCalculator()
@@ -350,6 +399,7 @@ class MisrepairCalculator:
         self.fastFoci = fastFoci
         self.slowFoci = slowFoci
         self.mmejFoci = mmejFoci
+        self.rateTable = None
 
     def fullRepair(self, baseBreaks, sigma, repeats=1, addFociClearance=True, radius=1,
                    chromSizes=None, sizeLimit=0, finalTime=np.inf):
@@ -401,8 +451,7 @@ class MisrepairCalculator:
         if self.rateTable is None:
             breakList.sort(key=lambda x:x[7])
             self.buildRateTable(breakList, sigma)
-        else:
-            rateTable = self.rateTable.copy()
+        rateTable = self.rateTable.copy()
         # Get fast/slow kinetic data from breaklist
         repairRate = np.array([self.fastRate/2 if b[2]==False else self.slowRate/2 for b in breakList])
         # Sample interaction time for every break
