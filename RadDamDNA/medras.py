@@ -62,7 +62,7 @@ class MedrasRepair:
         self.radialRun = False
         self.trackRun = False
 
-    def repairSimulation(self, path='', type='Fidelity', recalculateDamages=True):
+    def repairSimulation(self, path='', type='Fidelity', recalculateDamages=True, version='2.0'):
         summaries = []
         if self.damage is not None:
             self.damage.computeMedrasBreaks(recalculateDamages)
@@ -76,7 +76,7 @@ class MedrasRepair:
                 if os.path.isdir(filePath) or (filePath[-7:] != 'sdd.txt' and filePath[-3:] != 'sdd'):
                     continue
                 self.damage = DamageToDNA()
-                self.damage.readFromSDD(filePath)
+                self.damage.readFromSDD(filePath, version)
                 self.damage.computeMedrasBreaks()
                 # Find matching method and run
         else:

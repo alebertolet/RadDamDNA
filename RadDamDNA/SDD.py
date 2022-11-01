@@ -13,6 +13,7 @@ class SDDReader:
         self.file.close()
         self.__readHeader()
         self.__readDamage()
+        self.version = version
 
     def __splitLines(self):
         lines = self.file.readlines()
@@ -117,9 +118,9 @@ class SDDReader:
         print(self.damages)
 
 class SDDDamageSite:
-    def __init__(self, defectiveChromosomeNumber=False):
+    def __init__(self, version='2.0'):
         self.initialBp = 0
-        self.defectiveChromosomeNumber = defectiveChromosomeNumber
+        self.version = version
         self.particles = []
 
     def PrintProperties(self):
@@ -162,7 +163,7 @@ class SDDDamageSite:
     def ChromosomeID(self, v):
         self._chromosomeID = v
         self.typeOfChromatine = int(v[0])
-        if self.defectiveChromosomeNumber:
+        if float(self.version) < 2.0:
             self.chromosomeNumber = int(v[1])-1  ### -1 IS FOR THE OLD VERSION OF THE SCORER; THIS HAS BEEN CORRECTED
         else:
             self.chromosomeNumber = int(v[1])
@@ -206,7 +207,18 @@ class SDDDamageSite:
         self.individualdamages = []
         for i in range(0, self.ndamages):
             damage = {}
-            damage['subcomponent'] = int(v[i*3])
+            subid = int(v[i*3])
+            if float(self.version) < 2.0:
+                damage['subcomponent'] = subid
+            else:
+                if subid == 1:
+                    damage['subcomponent'] = 2
+                elif subid == 2:
+                    damage['subcomponent'] = 1
+                elif subid == 3:
+                    damage['subcomponent'] = 4
+                elif subid == 4:
+                    damage['subcomponent'] = 3
             damage['basepairID'] = int(v[i*3+1])
             damage['type'] = int(v[i*3+2])
             if damage['type'] == 4:

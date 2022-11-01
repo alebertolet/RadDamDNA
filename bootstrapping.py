@@ -59,7 +59,7 @@ for ip, e in enumerate(energies):
         neworder = random.sample(listOfAvailableDirs, len(listOfAvailableDirs))
         for j in neworder:
             path = basepath + str(j) + '/'
-            damage.readSDDAndDose(path, defectiveChromosomeNumber=True)
+            damage.readSDDAndDose(path, version='1.0')
 
         damage.populateDamages(stopAtDose=maxdose)
         damage.computeStrandBreaks()

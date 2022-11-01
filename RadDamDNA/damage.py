@@ -36,7 +36,7 @@ class DamageToDNA:
         self.numBD = 0; self.numBDDirect = 0; self.numBDIndirect = 0
         self.numSSBPlus = 0; self.numDSBPlus = 0; self.numDSBComplex = 0
 
-    def readSDDAndDose(self, path, namessd = 'DNADamage_sdd.txt', namephsp = 'DNADamage.phsp', defectiveChromosomeNumber=False, particleTime=0, lesionTime=0):
+    def readSDDAndDose(self, path, namessd = 'DNADamage_sdd.txt', namephsp = 'DNADamage.phsp', version='2.0', particleTime=0, lesionTime=0):
         if namephsp is not None:
             dosepath = path + namephsp
             f = open(dosepath, 'r')
@@ -45,18 +45,18 @@ class DamageToDNA:
                 split = l.split()
                 self.doses = np.append(self.doses, float(split[1]))
         sddpath = path + namessd
-        self.readFromSDD(sddpath, defectiveChromosomeNumber, particleTime, lesionTime)
+        self.readFromSDD(sddpath, version, particleTime, lesionTime)
         f.close()
         self.namessd = namessd
         self.namephsp = namephsp
 
-    def readFromSDD(self, path, dcn=False, particleTime=0, lesionTime=0):
+    def readFromSDD(self, path, version='2.0', particleTime=0, lesionTime=0):
         reader = SDDReader(path)
         for key in reader.headerProperties:
             setattr(self, key.replace("/", "_"), reader.headerProperties[key])
         self.nbpForDSB = int(self.Damagedefinition[2])
         for d in reader.damages:
-            dsite = SDDDamageSite(dcn)
+            dsite = SDDDamageSite(version)
             for key in d:
                 setattr(dsite, key, d[key])
             dsite.initialBp = np.round(dsite.ChromosomePosition * self.Chromosomesizes[dsite.chromosomeNumber]*1e6)

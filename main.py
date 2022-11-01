@@ -25,7 +25,7 @@ for j in range(nfiles):
 neworder = random.sample(listOfAvailableDirs, len(listOfAvailableDirs))
 for i, e in enumerate(neworder):
     path = basepath + str(e) + '/'
-    damage.readSDDAndDose(path, defectiveChromosomeNumber=True)
+    damage.readSDDAndDose(path, version='1.0')
 
 damage.populateDamages(getVideo=False, stopAtDose=maxdose)
 damage.computeStrandBreaks()
