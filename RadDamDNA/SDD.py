@@ -121,6 +121,8 @@ class SDDDamageSite:
         self.initialBp = 0
         self.version = version
         self.particles = []
+        self.LesionTime = 0
+        self.ParticleTime = 0
 
     def PrintProperties(self):
         temp = vars(self)

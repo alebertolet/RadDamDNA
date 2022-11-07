@@ -18,41 +18,93 @@ class Simulator:
         self.runManager.Run()
 
 class RunManager:
-    def __init__(self, dam, timeOptions = [], diffusionmodel='free', nucleusMaxRadius = None):
+    def __init__(self, dam, timeOptions = [], diffusionmodel='free', nucleusMaxRadius = None, dsbrepairmodel='standard', ssbrepairmodel='standard', bdrepairmodel='standard'):
         if diffusionmodel == 'free':
             self.DiffusionActivated = True
             self.diffusionModel = processes.Diffusion()
+        if dsbrepairmodel == 'standard':
+            self.DSBRepairActivated = True
+            self.dsbRepairModel = processes.DSBRepair()
+        if ssbrepairmodel == 'standard':
+            self.SSBRepairActivated = True
+            self.ssbRepairModel = processes.SSBRepair()
+        if bdrepairmodel == 'standard':
+            self.BDRepairActivated = True
+            self.bdRepairModel = processes.BDRepair()
         if len(timeOptions) > 3:
             self.clock = Clock(timeOptions[0], timeOptions[1], timeOptions[2], timeOptions[3])
         else:
             self.clock = Clock(timeOptions[0], timeOptions[1], timeOptions[2])
         self.nucleusMaxRadius = nucleusMaxRadius
-        self.InitializeBeTracks(dam)
+        self.damage = dam
+        self.InitializeTracks(dam)
 
-    def InitializeBeTracks(self, dam):
+    def InitializeTracks(self, dam):
         trackid = 0
         self.betracks = []
+        self.ssbdamages = []
+        self.bdamages = []
         for iCh in dam.DSBMap:
             for iBp in dam.DSBMap[iCh]:
                 for iCo in dam.DSBMap[iCh][iBp]:
                     if dam.DSBMap[iCh][iBp][iCo].type > 0:
                         pos = dam.DSBMap[iCh][iBp][iCo].position
                         time = dam.DSBMap[iCh][iBp][iCo].particletime
-                        newBeStep = tracking.BeStep(pos, time)
+                        newBeStep = tracking.BeStep(pos, time, complexity=dam.DSBMap[iCh][iBp][iCo].complexity)
                         newBeTrack = tracking.BeTrack(trackid)
+                        newBeTrack.ChromosomeID = iCh
+                        newBeTrack.BasePairID = iBp
+                        newBeTrack.StrandID = iCo
                         newBeTrack.AddNewStep(newBeStep)
                         self.betracks.append(newBeTrack)
+                        trackid += 1
+        for iCh in dam.SSBMap:
+            for iBp in dam.SSBMap[iCh]:
+                for iCo in dam.SSBMap[iCh][iBp]:
+                    if dam.SSBMap[iCh][iBp][iCo].type > 0:
+                        pos = dam.SSBMap[iCh][iBp][iCo].position
+                        time = dam.SSBMap[iCh][iBp][iCo].particletime
+                        newSSBDamage = tracking.DamageTrack(trackid)
+                        newSSBDamage.Time = time
+                        newSSBDamage.Position = pos
+                        newSSBDamage.ChromosomeID = iCh
+                        newSSBDamage.BasePairID = iBp
+                        newSSBDamage.StrandID = iCo
+                        newSSBDamage.Complexity = dam.SSBMap[iCh][iBp][iCo].complexity
+                        self.ssbdamages.append(newSSBDamage)
+                        trackid += 1
+        for iCh in dam.BDMap:
+            for iBp in dam.BDMap[iCh]:
+                for iCo in dam.BDMap[iCh][iBp]:
+                    if dam.BDMap[iCh][iBp][iCo].type > 0:
+                        pos = dam.BDMap[iCh][iBp][iCo].position
+                        time = dam.BDMap[iCh][iBp][iCo].particletime
+                        newBDDamage = tracking.DamageTrack(trackid)
+                        newBDDamage.Time = time
+                        newBDDamage.Position = pos
+                        newBDDamage.ChromosomeID = iCh
+                        newBDDamage.BasePairID = iBp
+                        newBDDamage.StrandID = iCo
+                        newBDDamage.Complexity = dam.BDMap[iCh][iBp][iCo].complexity
+                        self.bdamages.append(newBDDamage)
                         trackid += 1
 
     def Run(self):
         while self.clock.CurrentTime != self.clock.FinalTime:
             self.clock.AdvanceTimeStep()
-            if self.DiffusionActivated:
-                self.DoDiffusion()
+            self.DoOneStep()
 
     def DoOneStep(self):
         if self.DiffusionActivated:
             self.DoDiffusion()
+        if self.DSBRepairActivated:
+            self.DoDSBRepair()
+        if self.SSBRepairActivated:
+            self.DoSSBRepair()
+        if self.BDRepairActivated:
+            self.DoBDRepair()
+        self.UpdateDamageMaps()
+        self.damage.printDamageCount()
 
     def DoDiffusion(self):
         for i, t in enumerate(self.betracks):
@@ -61,6 +113,51 @@ class RunManager:
                 newpos = self.diffusionModel.Diffuse(t.GetLastStep().Position, self.clock.CurrentTimeStep)
             newstep = tracking.BeStep(newpos, self.clock.CurrentTime)
             self.betracks[i].AddNewStep(newstep)
+
+    def DoDSBRepair(self):
+        for i in range(len(self.betracks)):
+            if self.betracks[i].GetLastStep().Status == 1:
+                for j in range(i + 1, len(self.betracks)):
+                    distance = self._getDistance(self.betracks[i], self.betracks[j])
+                    if distance <= self.dsbRepairModel.InteractionRadius:
+                        newstatus = self.dsbRepairModel.Repair(self.betracks[i], self.betracks[j])
+                        self.betracks[i].GetLastStep().Status = newstatus
+                        self.betracks[j].GetLastStep().Status = newstatus
+
+    def DoSSBRepair(self):
+        for i in range(len(self.ssbdamages)):
+            if self.ssbdamages[i].Status == 1:
+                newstatus = self.ssbRepairModel.Repair(self.ssbdamages[i])
+                self.ssbdamages[i].Status = newstatus
+
+    def DoBDRepair(self):
+        for i in range(len(self.bdamages)):
+            if self.bdamages[i].Status == 1:
+                newstatus = self.bdRepairModel.Repair(self.bdamages[i])
+                self.bdamages[i].Status = newstatus
+
+    def UpdateDamageMaps(self):
+        for be in self.betracks:
+            if be.GetLastStep().Status == 2:
+                iCh = be.ChromosomeID
+                iBp = be.BasePairID
+                iCo = be.StrandID + 1
+                self.damage.damageMap[iCh][iBp][iCo].type = 0
+        for ssb in self.ssbdamages:
+            if ssb.Status == 2:
+                iCh = ssb.ChromosomeID
+                iBp = ssb.BasePairID
+                iCo = ssb.StrandID + 1
+                self.damage.damageMap[iCh][iBp][iCo].type = 0
+        for bd in self.bdamages:
+            if bd.Status == 2:
+                iCh = bd.ChromosomeID
+                iBp = bd.BasePairID
+                iCo = bd.StrandID
+                if iCo == 2:
+                    iCo = 4
+                self.damage.damageMap[iCh][iBp][iCo].type = 0
+        self.damage.recomputeDamagesFromReadSites(stopAtTime=self.clock.CurrentTime)
 
     def _checkPosWithinNucleus(self, pos):
         if self.nucleusMaxRadius is None:
@@ -79,6 +176,36 @@ class RunManager:
     @DiffusionActivated.setter
     def DiffusionActivated(self, b):
         self._diffusionactivated = b
+
+    @property
+    def DSBRepairActivated(self):
+        if self._dsbrepactivated is False:
+            return self._dsbrepactivated
+        else:
+            return True
+    @DSBRepairActivated.setter
+    def DSBRepairActivated(self, b):
+        self._dsbrepactivated = b
+
+    @property
+    def SSBRepairActivated(self):
+        if self._ssbrepactivated is False:
+            return self._ssbrepactivated
+        else:
+            return True
+    @SSBRepairActivated.setter
+    def SSBRepairActivated(self, b):
+        self._ssbrepactivated = b
+
+    @property
+    def BDRepairActivated(self):
+        if self._bdrepactivated is False:
+            return self._bdrepactivated
+        else:
+            return True
+    @BDRepairActivated.setter
+    def BDRepairActivated(self, b):
+        self._bdrepactivated = b
 
     def _getDistance(self, betrack1, betrack2):
         pos1 = betrack1.GetLastStep().Position

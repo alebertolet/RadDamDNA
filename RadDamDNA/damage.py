@@ -16,6 +16,7 @@ class DamageToDNA:
         self.initializeStructures()
         self.initializeCounters()
         self.SetUpColorMap()
+        self.stopAtDose = -1.0
 
     def initializeStructures(self):
         self.damageSites = []
@@ -71,7 +72,9 @@ class DamageToDNA:
         self.computeStrandBreaks()
 
     def populateDamages(self, getVideo=False, stopAtDose = -1, stopAtTime = -1):
-        # Key of damage map is the chromosome number
+        # Initial dose to stop
+        if stopAtDose > 0:
+            self.stopAtDose = stopAtDose
         iExposure = -1
         if getVideo:
             d = os.getcwd() + '/RadDamDNA/video/'
@@ -79,17 +82,17 @@ class DamageToDNA:
                 os.remove(os.path.join(d, f))
         iEvent = 0
         # Handling a parallel list of damage sites considering time
+        damageSites = self.damageSites.copy()
         if stopAtTime == -1:
-            for damage in self.damageSites:
+            for damage in damageSites:
                 self.damageSitesAtCurrentTime.append(damage) # These damages can be modified by repair
-                self.damageSites.remove(damage) # Removing to avoid adding the same damage again
         else:
-            for damage in self.damageSites:
+            for damage in damageSites:
                 if damage.LesionTime <= stopAtTime:
                     self.damageSitesAtCurrentTime.append(damage)
-                    self.damageSites.remove(damage)
+        del(damageSites)
         for id, damage in enumerate(self.damageSitesAtCurrentTime):
-            if stopAtDose > 0 and self.accumulateDose > stopAtDose:
+            if (0 < self.stopAtDose < self.accumulateDose) or damage not in self.damageSites:
                 break
             iCh = damage.chromosomeNumber
             if iCh not in self.damageMap.keys():
@@ -117,6 +120,7 @@ class DamageToDNA:
                         self.produce3DImage(show=False)
             if damage.newExposure == 1:
                 iEvent += 1
+            self.damageSites.remove(damage)  # Removing to avoid adding the same damage again
 
     def computeStrandBreaks(self):
         self.DSBMap = {}
@@ -340,7 +344,6 @@ class DamageToDNA:
                             damageScore[iCh][iBp][iCo] = 0
                         if self.DSBMap[iCh][iBp][iCo].type > 0 and self.DSBMap[iCh][iBp][iCo].particletime == time:
                             damageScore[iCh][iBp][iCo] += 5.0
-                            self.DSBMap[iCh][iBp][iCo].complexity = damageScore[iCh][iBp][iCo]
 
             chromosomeAndInitialBpIdOfDamageSites = {}
             for iCh in damageScore.keys():
@@ -370,6 +373,7 @@ class DamageToDNA:
                     if maxDamage < minDamage:
                         break
                     startingBpIdForDamageSites.append(index)
+                    self.assignComplexities(iCh, index, maxDamage)
                     for i in range(self.nbpForDSB):
                         if index + i in damageScore[iCh].keys():
                             damageScore[iCh][index + i][1] = 0
@@ -379,6 +383,27 @@ class DamageToDNA:
                 chromosomeAndInitialBpIdOfDamageSites[iCh] = startingBpIdForDamageSites
             listOfChrAndIniBpIdPertTime.append(chromosomeAndInitialBpIdOfDamageSites)
         return listOfChrAndIniBpIdPertTime
+
+    def assignComplexities(self, iChr, iBp, damage):
+        for i in range(self.nbpForDSB):
+            if iChr in self.BDMap.keys():
+                if iBp + i in self.BDMap[iChr].keys():
+                    if 1 in self.BDMap[iChr][iBp + i].keys():
+                        self.BDMap[iChr][iBp+i][1].complexity = damage
+                    if 2 in self.BDMap[iChr][iBp + i].keys():
+                        self.BDMap[iChr][iBp+i][2].complexity = damage
+            if iChr in self.SSBMap.keys():
+                if iBp + i in self.SSBMap[iChr].keys():
+                    if 1 in self.SSBMap[iChr][iBp + i].keys():
+                        self.SSBMap[iChr][iBp+i][1].complexity = damage
+                    if 2 in self.SSBMap[iChr][iBp + i].keys():
+                        self.SSBMap[iChr][iBp+i][2].complexity = damage
+            if iChr in self.DSBMap.keys():
+                if iBp + i in self.DSBMap[iChr].keys():
+                    if 1 in self.DSBMap[iChr][iBp + i].keys():
+                        self.DSBMap[iChr][iBp+i][1].complexity = damage
+                    if 2 in self.DSBMap[iChr][iBp + i].keys():
+                        self.DSBMap[iChr][iBp+i][2].complexity = damage
 
     def recomputeSitesAtCurrentTime(self):
         sitespertime = self.classifiedDamageSites
@@ -448,7 +473,6 @@ class DamageToDNA:
                                             bd += 1
                         ibpsTakenForThisChromosome.append(initialBpId + j)
                     numSites += 1
-                    string = ''
                     #Field 1
                     newExposureFlag = str(0)
                     if newEvent:

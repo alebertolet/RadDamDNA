@@ -8,8 +8,8 @@ Created on 11/6/22 3:00 PM
 import numpy as np
 
 class TrackPairProcess:
-    def __init__(self, trackPair):
-        self.TrackPair = trackPair
+    def __init__(self):
+        pass
 
     @property
     def InteractionRadius(self):
@@ -17,13 +17,6 @@ class TrackPairProcess:
     @InteractionRadius.setter
     def InteractionRadius(self, r):
         self._intradius = r
-
-    @property
-    def InteractionRate(self):
-        return self._intrate
-    @InteractionRate.setter
-    def InteractionRate(self, r):
-        self._intrate = r
 
 class Diffusion:
     def __init__(self, model='free'):
@@ -42,10 +35,36 @@ class Diffusion:
         else:
             return pos
 
-class Repair(TrackPairProcess):
-    def __init__(self, trackPair):
-        super().__init__(trackPair)
+class DSBRepair(TrackPairProcess):
+    def __init__(self, model='standard'):
+        if model == 'standard':
+            self.ActivateDSBRepairStandard()
 
-class Misrepair(TrackPairProcess):
-    def __init__(self, trackPair):
-        super().__init__(trackPair)
+    def ActivateDSBRepairStandard(self):
+        self.model = 0
+        self.InteractionRadius = 1e8
+
+    def Repair(self, betrack1, betrack2):
+        pass
+
+class SSBRepair:
+    def __init__(self, model='standard'):
+        if model == 'standard':
+            self.ActivateSSBRepairStandard()
+
+    def ActivateSSBRepairStandard(self):
+        self.model = 0
+
+    def Repair(self, damtrack):
+        pass
+
+class BDRepair:
+    def __init__(self, model='standard'):
+        if model == 'standard':
+            self.ActivateBDRepairStandard()
+
+    def ActivateBDRepairStandard(self):
+        self.model = 0
+
+    def Repair(self, damtrack):
+        pass
