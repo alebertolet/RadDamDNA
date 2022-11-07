@@ -124,6 +124,7 @@ class DamageToDNA:
         self.SSBMap = {}
         self.BDMap = {}
         self.DSBPositions = []
+        numberofdsbs = 0
         for iCh in self.damageMap.keys():
             if iCh not in self.DSBMap.keys():
                 self.DSBMap[iCh] = {}
@@ -173,14 +174,17 @@ class DamageToDNA:
                                                     if typeDamageInStrand1 == 1 or typeDamageInStrand1 == 3:
                                                         adjustedTypeDamageInStrand1 = 1
                                                     break
+                                numberofdsbs += 1
                                 posSB1 = np.array(self.damageMap[iCh][closestPosInStrand1][2].position)
                                 posSB2 = np.array(self.damageMap[iCh][iBp + i2][3].position)
                                 self.DSBMap[iCh][closestPosInStrand1][1] = SubcomponentLesion(0, posSB1, 0, 0)
                                 self.DSBMap[iCh][closestPosInStrand1][1].type = adjustedTypeDamageInStrand1
                                 self.DSBMap[iCh][closestPosInStrand1][1].particletime = self.damageMap[iCh][closestPosInStrand1][2].particletime
+                                self.DSBMap[iCh][closestPosInStrand1][1].dsbID = numberofdsbs
                                 self.DSBMap[iCh][iBp+i2][2] = SubcomponentLesion(0, posSB2, 0, 0)
                                 self.DSBMap[iCh][iBp+i2][2].type = adjustedTypeDamageInStrand2
                                 self.DSBMap[iCh][iBp+i2][2].particletime = self.damageMap[iCh][iBp+i2][3].particletime
+                                self.DSBMap[iCh][iBp+i2][2].dsbID = numberofdsbs
                                 pos = (closestPosInStrand1, iBp + i2)
                                 DSBPairs[iCh][pos] = adjustedTypeDamageInStrand1 + adjustedTypeDamageInStrand2
                                 self.DSBPositions.append((posSB1 + posSB2)/2)
@@ -217,14 +221,17 @@ class DamageToDNA:
                                                     if typeDamageInStrand1 == 1 or typeDamageInStrand1 == 3:
                                                         adjustedTypeDamageInStrand1 = 1
                                                     break
+                                    numberofdsbs += 1
                                     posSB1 = np.array(self.damageMap[iCh][closestPosInStrand1][2].position)
                                     posSB2 = np.array(self.damageMap[iCh][iBp - i2][3].position)
                                     self.DSBMap[iCh][closestPosInStrand1][1] = SubcomponentLesion(0, posSB1, 0, 0)
                                     self.DSBMap[iCh][closestPosInStrand1][1].type = adjustedTypeDamageInStrand1
                                     self.DSBMap[iCh][closestPosInStrand1][1].particletime = self.damageMap[iCh][closestPosInStrand1][2].particletime
+                                    self.DSBMap[iCh][closestPosInStrand1][1].dsbID = numberofdsbs
                                     self.DSBMap[iCh][iBp-i2][2] = SubcomponentLesion(0, posSB2, 0, 0)
                                     self.DSBMap[iCh][iBp-i2][2].type = adjustedTypeDamageInStrand2
                                     self.DSBMap[iCh][iBp-i2][2].particletime = self.damageMap[iCh][iBp-i2][3].particletime
+                                    self.DSBMap[iCh][iBp-i2][2].dsbID = numberofdsbs
                                     pos = (closestPosInStrand1, iBp - i2)
                                     DSBPairs[iCh][pos] = adjustedTypeDamageInStrand1 + adjustedTypeDamageInStrand2
                                     self.DSBPositions.append((posSB1 + posSB2) / 2)
@@ -257,6 +264,7 @@ class DamageToDNA:
                 if 4 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][4].type > 0:
                     self.BDMap[iCh][iBp][2] = SubcomponentLesion(self.damageMap[iCh][iBp][4].type, self.damageMap[iCh][iBp][4].position, self.damageMap[iCh][iBp][4].lesiontime, self.damageMap[iCh][iBp][4].particletime)
         self.quantifyDamage(DSBPairs, self.SSBMap, self.BDMap)
+        self.classifiedDamageSites = self.classifyDamageSites()
 
     def quantifyDamage(self, DSBPairs, SSBMap, BDMap):
         self.initializeCounters()
@@ -332,6 +340,8 @@ class DamageToDNA:
                             damageScore[iCh][iBp][iCo] = 0
                         if self.DSBMap[iCh][iBp][iCo].type > 0 and self.DSBMap[iCh][iBp][iCo].particletime == time:
                             damageScore[iCh][iBp][iCo] += 5.0
+                            self.DSBMap[iCh][iBp][iCo].complexity = damageScore[iCh][iBp][iCo]
+
             chromosomeAndInitialBpIdOfDamageSites = {}
             for iCh in damageScore.keys():
                 linearAccumulatedDamage = []
@@ -371,7 +381,7 @@ class DamageToDNA:
         return listOfChrAndIniBpIdPertTime
 
     def recomputeSitesAtCurrentTime(self):
-        sitespertime = self.classifyDamageSites()
+        sitespertime = self.classifiedDamageSites
         numSites = 0
         firstExposure = True
         self.damageSitesAtCurrentTime.clear()
@@ -570,7 +580,7 @@ class DamageToDNA:
             f.write("***EndOfHeader***;\n")
 
     def outputSDDFile(self, filename, version='2.0'):
-        damageSitesPerTime = self.classifyDamageSites()
+        damageSitesPerTime = self.classifiedDamageSites
         numSites = 0
         firstExposure = True
         for damageSites in damageSitesPerTime:
@@ -1150,9 +1160,11 @@ class DamageToDNA:
         plt.register_cmap(cmap=map_object)
 
 class SubcomponentLesion:
-    def __init__(self, type, position, lesiontime, particletime, eventid=0):
+    def __init__(self, type, position, lesiontime, particletime, eventid=0, dsbid=None, complexity=None):
         self.type = type
         self.position = position
         self.lesiontime = lesiontime
         self.particletime = particletime
         self.eventID = eventid
+        self.dsbID = dsbid
+        self.sitecomplexity = complexity
