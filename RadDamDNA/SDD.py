@@ -13,7 +13,6 @@ class SDDReader:
         self.file.close()
         self.__readHeader()
         self.__readDamage()
-        self.version = version
 
     def __splitLines(self):
         lines = self.file.readlines()
