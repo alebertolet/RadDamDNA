@@ -11,7 +11,7 @@ import random
 
 ####################
 #### SCRIPT TO READ DAMAGE DATA FROM TOPAS-NBIO
-maxdose = 0.5
+maxdose = 2.0
 damage = DamageToDNA()
 basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/xray/sims/250keV.txt/'
 nfiles = len(os.listdir(basepath))
@@ -34,7 +34,7 @@ damage.printDamageCount()
 ##############
 
 # Time options is a list with initial, final times and number of steps (or a list of custom time points as 4th arg)
-timeOptions = [0, 60*60, 20]
+timeOptions = [0, 25*3600, 100]
 nucleusMaxRadius = 4.65
 diffusionModel = 'free'
 sim = Simulator(damage, timeOptions, diffusionModel, nucleusMaxRadius)

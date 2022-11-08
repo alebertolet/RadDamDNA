@@ -10,7 +10,15 @@ import numpy as np
 
 from RadDamDNA.bioStage import processes
 from RadDamDNA.bioStage import tracking
+from RadDamDNA.bioStage import output
 from RadDamDNA import damage
+
+DAMAGED = 1
+REPAIRED = 2
+MISREPAIRED = 3
+
+# Outputs
+DSB = 0
 
 class Simulator:
     def __init__(self, originalDamage, timeOptions=[], diffusionmodel='free', nucleusMaxRadius = None):
@@ -18,7 +26,8 @@ class Simulator:
         self.runManager.Run()
 
 class RunManager:
-    def __init__(self, dam, timeOptions = [], diffusionmodel='free', nucleusMaxRadius = None, dsbrepairmodel='standard', ssbrepairmodel='standard', bdrepairmodel='standard'):
+    def __init__(self, dam, timeOptions = [], diffusionmodel='free', nucleusMaxRadius = None, dsbrepairmodel='standard', ssbrepairmodel='standard', bdrepairmodel='standard',
+                 outputs=[DSB]):
         if diffusionmodel == 'free':
             self.DiffusionActivated = True
             self.diffusionModel = processes.Diffusion()
@@ -37,9 +46,10 @@ class RunManager:
             self.clock = Clock(timeOptions[0], timeOptions[1], timeOptions[2])
         self.nucleusMaxRadius = nucleusMaxRadius
         self.damage = dam
-        self.InitializeTracks(dam)
+        self.outputs = outputs
+        self.Initialize(dam)
 
-    def InitializeTracks(self, dam):
+    def Initialize(self, dam):
         trackid = 0
         self.betracks = []
         self.ssbdamages = []
@@ -51,7 +61,7 @@ class RunManager:
                         pos = dam.DSBMap[iCh][iBp][iCo].position
                         time = dam.DSBMap[iCh][iBp][iCo].particletime
                         newBeStep = tracking.BeStep(pos, time, complexity=dam.DSBMap[iCh][iBp][iCo].complexity)
-                        newBeTrack = tracking.BeTrack(trackid)
+                        newBeTrack = tracking.BeTrack(trackid, dam.DSBMap[iCh][iBp][iCo].dsbID)
                         newBeTrack.ChromosomeID = iCh
                         newBeTrack.BasePairID = iBp
                         newBeTrack.StrandID = iCo
@@ -88,13 +98,19 @@ class RunManager:
                         newBDDamage.Complexity = dam.BDMap[iCh][iBp][iCo].complexity
                         self.bdamages.append(newBDDamage)
                         trackid += 1
+        # Initialize outputs
+        if DSB in self.outputs:
+            self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
 
     def Run(self):
         while self.clock.CurrentTime != self.clock.FinalTime:
             self.clock.AdvanceTimeStep()
             self.DoOneStep()
+        if DSB in self.outputs:
+            self.outDSB.Plot()
+            self.outDSB.WriteCSV()
 
-    def DoOneStep(self):
+    def DoOneStep(self, outputs=['DSB']):
         if self.DiffusionActivated:
             self.DoDiffusion()
         if self.DSBRepairActivated:
@@ -104,7 +120,8 @@ class RunManager:
         if self.BDRepairActivated:
             self.DoBDRepair()
         self.UpdateDamageMaps()
-        self.damage.printDamageCount()
+        if DSB in self.outputs:
+            self.DSBEvolution()
 
     def DoDiffusion(self):
         for i, t in enumerate(self.betracks):
@@ -115,42 +132,46 @@ class RunManager:
             self.betracks[i].AddNewStep(newstep)
 
     def DoDSBRepair(self):
-        for i in range(len(self.betracks)):
-            if self.betracks[i].GetLastStep().Status == 1:
-                for j in range(i + 1, len(self.betracks)):
-                    distance = self._getDistance(self.betracks[i], self.betracks[j])
-                    if distance <= self.dsbRepairModel.InteractionRadius:
-                        newstatus = self.dsbRepairModel.Repair(self.betracks[i], self.betracks[j])
-                        self.betracks[i].GetLastStep().Status = newstatus
-                        self.betracks[j].GetLastStep().Status = newstatus
+        self.misrepairedlist = []
+        repair = self.dsbRepairModel.Repair(self.betracks, self.clock.CurrentTimeStep)
+        for i in range(repair.shape[0]):
+            for j in range(i+1, repair.shape[1]):
+                if repair[i, j]:
+                    if self.betracks[i].DSBid == self.betracks[j].DSBid:
+                        self.betracks[i].GetLastStep().Status = REPAIRED
+                        self.betracks[j].GetLastStep().Status = REPAIRED
+                    else:
+                        self.betracks[i].GetLastStep().Status = MISREPAIRED
+                        self.betracks[j].GetLastStep().Status = MISREPAIRED
+                        self.misrepairedlist.append([self.betracks[i], self.betracks[j]])
 
     def DoSSBRepair(self):
         for i in range(len(self.ssbdamages)):
-            if self.ssbdamages[i].Status == 1:
-                newstatus = self.ssbRepairModel.Repair(self.ssbdamages[i], self.clock.CurrentTimeStep)
-                self.ssbdamages[i].Status = newstatus
+            if self.ssbdamages[i].Status == DAMAGED:
+                if self.ssbRepairModel.Repair(self.ssbdamages[i], self.clock.CurrentTimeStep):
+                    self.ssbdamages[i].Status = REPAIRED
 
     def DoBDRepair(self):
         for i in range(len(self.bdamages)):
-            if self.bdamages[i].Status == 1:
-                newstatus = self.bdRepairModel.Repair(self.bdamages[i], self.clock.CurrentTimeStep)
-                self.bdamages[i].Status = newstatus
+            if self.bdamages[i].Status == DAMAGED:
+                if self.bdRepairModel.Repair(self.bdamages[i], self.clock.CurrentTimeStep):
+                    self.bdamages[i].Status = REPAIRED
 
     def UpdateDamageMaps(self):
         for be in self.betracks:
-            if be.GetLastStep().Status == 2:
+            if be.GetLastStep().Status == REPAIRED or be.GetLastStep().Status == MISREPAIRED:
                 iCh = be.ChromosomeID
                 iBp = be.BasePairID
                 iCo = be.StrandID + 1
                 self.damage.damageMap[iCh][iBp][iCo].type = 0
         for ssb in self.ssbdamages:
-            if ssb.Status == 2:
+            if ssb.Status == REPAIRED:
                 iCh = ssb.ChromosomeID
                 iBp = ssb.BasePairID
                 iCo = ssb.StrandID + 1
                 self.damage.damageMap[iCh][iBp][iCo].type = 0
         for bd in self.bdamages:
-            if bd.Status == 2:
+            if bd.Status == REPAIRED:
                 iCh = bd.ChromosomeID
                 iBp = bd.BasePairID
                 iCo = bd.StrandID
@@ -158,6 +179,9 @@ class RunManager:
                     iCo = 4
                 self.damage.damageMap[iCh][iBp][iCo].type = 0
         self.damage.recomputeDamagesFromReadSites(stopAtTime=self.clock.CurrentTime)
+
+    def DSBEvolution(self):
+        self.outDSB.AddTimePoint(self.clock.CurrentTime, self.damage.numDSB)
 
     def _checkPosWithinNucleus(self, pos):
         if self.nucleusMaxRadius is None:
@@ -206,11 +230,6 @@ class RunManager:
     @BDRepairActivated.setter
     def BDRepairActivated(self, b):
         self._bdrepactivated = b
-
-    def _getDistance(self, betrack1, betrack2):
-        pos1 = betrack1.GetLastStep().Position
-        pos2 = betrack2.GetLastStep().Position
-        return np.sqrt(np.power(pos1[0] - pos2[0], 2) + np.power(pos1[1] - pos2[1], 2) + np.power(pos1[2] - pos2[2], 2))
 
 class Clock:
     def __init__(self, initialTime, finalTime, nSteps, listOfTimePoints = None):

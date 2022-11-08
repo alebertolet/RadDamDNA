@@ -131,8 +131,9 @@ class DamageTrack:
             self._status = 3
 
 class BeTrack(DamageTrack):
-    def __init__(self, trackid = -1):
+    def __init__(self, trackid = -1, dsbid = 0):
         super().__init__(trackid)
+        self.DSBid = dsbid
         self.Steps = []
 
     def AddNewStep(self, step):
