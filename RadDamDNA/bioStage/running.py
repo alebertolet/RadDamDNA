@@ -127,13 +127,13 @@ class RunManager:
     def DoSSBRepair(self):
         for i in range(len(self.ssbdamages)):
             if self.ssbdamages[i].Status == 1:
-                newstatus = self.ssbRepairModel.Repair(self.ssbdamages[i])
+                newstatus = self.ssbRepairModel.Repair(self.ssbdamages[i], self.clock.CurrentTimeStep)
                 self.ssbdamages[i].Status = newstatus
 
     def DoBDRepair(self):
         for i in range(len(self.bdamages)):
             if self.bdamages[i].Status == 1:
-                newstatus = self.bdRepairModel.Repair(self.bdamages[i])
+                newstatus = self.bdRepairModel.Repair(self.bdamages[i], self.clock.CurrentTimeStep)
                 self.bdamages[i].Status = newstatus
 
     def UpdateDamageMaps(self):

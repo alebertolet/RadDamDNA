@@ -55,8 +55,17 @@ class SSBRepair:
     def ActivateSSBRepairStandard(self):
         self.model = 0
 
-    def Repair(self, damtrack):
-        pass
+    def Repair(self, damtrack, timestep):
+        if self.model == 0:
+            # Two repair rates
+            self.repairRateNoComplex = 1.774e-3 # rep/s # Fitted to data from Schiplers and Iliakis 2013
+            self.repairRateComplex = 2.247e-16 # Complex SSB are way more difficult to repair
+            if damtrack.Complexity >= 10.0:
+                prob = 1 - np.exp(-self.repairRateComplex * timestep)
+            else:
+                prob = 1 - np.exp(-self.repairRateNoComplex * timestep)
+            r = np.random.random()
+            return 2 * (r <= prob)
 
 class BDRepair:
     def __init__(self, model='standard'):
@@ -66,5 +75,10 @@ class BDRepair:
     def ActivateBDRepairStandard(self):
         self.model = 0
 
-    def Repair(self, damtrack):
-        pass
+    def Repair(self, damtrack, timestep):
+        if self.model == 0:
+            # Single exponential repair
+            self.repairRate = 4.297e-4  # Fitted data from Rahmanian, Taleei and Nikjoo 2014
+            prob = 1 - np.exp(-self.repairRate * timestep)
+            r = np.random.random()
+            return 2 * (r <= prob)
