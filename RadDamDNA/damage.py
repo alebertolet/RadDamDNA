@@ -1181,7 +1181,10 @@ class DamageToDNA:
         color_array = plt.get_cmap('Reds')(range(ncolors))
         color_array[:, -1] = np.linspace(0.01, 0.99, ncolors)
         map_object = LinearSegmentedColormap.from_list(name='MyColorMapAlpha', colors=color_array)
-        plt.register_cmap(cmap=map_object)
+        try:
+            plt.register_cmap(cmap=map_object)
+        except:
+            pass
 
 class SubcomponentLesion:
     def __init__(self, type, position, lesiontime, particletime, eventid=0, dsbid=None, complexity=None):

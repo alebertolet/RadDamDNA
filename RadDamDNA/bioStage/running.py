@@ -42,7 +42,7 @@ class Simulator:
             for i in range(self.nRuns):
                 self.runManager.nRuns = 1
                 if i == self.nRuns - 1:
-                    self.plotflag = True
+                    self.runManager.plotflag = True
                 if i == 0:
                     self.runManager.Run()
                 else:
@@ -94,6 +94,7 @@ class RunManager:
         self.outputs = outputs
         self.runoutputDSB = output.AverageTimeCurveOverRuns()
         self.plotflag = True
+        self.currentrun = 0
 
     def Initialize(self, dam):
         trackid = 0
@@ -153,7 +154,8 @@ class RunManager:
         for i in range(self.nRuns):
             self.repairedList = []
             self.misrepairedlist = []
-            print('Repair run ' + str(i+1) + ' of ' + str(self.TotalRuns) + '...')
+            self.currentrun += 1
+            print('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
             self.Initialize(self.damage)
             if DSB in self.outputs:
                 self.DSBEvolution()

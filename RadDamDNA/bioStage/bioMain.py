@@ -11,7 +11,7 @@ from RadDamDNA.bioStage.running import Simulator
 timeOptions = [0, 25*3600, 100]
 nucleusMaxRadius = 4.65
 diffusionModel = 'free'
-nRuns = 10
+nRuns = 4
 # Damage to be incorporated
 basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/xray/sims/250keV.txt/'
 maxDose = 0.25
