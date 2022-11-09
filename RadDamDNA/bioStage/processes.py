@@ -34,7 +34,7 @@ class Diffusion:
 
     def ActivateFreeDiffusion(self):
         self.model = 0
-        self.Dcoeff = 1.7e-4 # um^2/s. Diffusion coefficient used by PARTRAC
+        self.Dcoeff = 2.0e-6 # um^2/s
 
     def Diffuse(self, pos, timestep):
         if self.model == 0:
@@ -56,12 +56,12 @@ class DSBRepair(TrackPairProcess):
     def Repair(self, tracklist, timestep):
         if self.model == 0:
             self.CompetentInNEHJ = True
-            self.distanceRegularization = 1.0  # um
+            self.distanceRegularization = 0.1  # um
             # Rates for different complexity combinations
             # Fast repair for not complex breaks
-            self.repairRateNCNC = 5.833e-5 # rep/s/um^2 # MEDRAS parameter adapted by distance
+            self.repairRateNCNC = 5.833e-4 # rep/s
             # Slow repair for complex breaks
-            self.repairRateComplex = 7.222e-7 # rep/s # MEDRAS parameter adapted by distance
+            self.repairRateComplex = 7.222e-5 # rep/s
             # Repair for when NHEJ is non active
             self.repairMMEJ = 2.361e-6 # rep/s # MEDRAS parameter adapted by distance
             ntracks = len(tracklist)
@@ -84,6 +84,8 @@ class DSBRepair(TrackPairProcess):
                         maxFori = probmatrix[i, j]
                         repj = j
                 if repj > 0:
+                    for k in range(ntracks):
+                        repaired[repj, k] = False
                     for j in range(i+1, ntracks):
                         if j != repj:
                             repaired[i, j] = False
@@ -99,7 +101,7 @@ class DSBRepair(TrackPairProcess):
                     distance = self.distanceRegularization
                 fd = np.power(self.distanceRegularization/distance, 2)
                 if self.CompetentInNEHJ:
-                    if betrack1.GetLastStep().Complexity == 10.0 and betrack2.GetLastStep().Complexity == 10:
+                    if betrack1.GetLastStep().Complexity <= 10.01 and betrack2.GetLastStep().Complexity <= 10.01:
                         return (1.0 - np.exp(-self.repairRateNCNC * timestep)) * fd
                     else:
                         return (1.0 - np.exp(-self.repairRateComplex * timestep)) * fd

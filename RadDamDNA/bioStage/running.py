@@ -7,11 +7,15 @@ Created on 11/6/22 3:15 PM
 """
 
 import numpy as np
+from copy import deepcopy, copy
 
 from RadDamDNA.bioStage import processes
 from RadDamDNA.bioStage import tracking
 from RadDamDNA.bioStage import output
-from RadDamDNA import damage
+from RadDamDNA.damage import DamageToDNA
+
+import random
+import os
 
 DAMAGED = 1
 REPAIRED = 2
@@ -19,15 +23,57 @@ MISREPAIRED = 3
 
 # Outputs
 DSB = 0
+MISREPDSB = 1
+SSB = 2
+BD = 3
 
 class Simulator:
-    def __init__(self, originalDamage, timeOptions=[], diffusionmodel='free', nucleusMaxRadius = None):
-        self.runManager = RunManager(originalDamage, timeOptions, diffusionmodel, nucleusMaxRadius)
-        self.runManager.Run()
+    def __init__(self, timeOptions=[], diffusionmodel='free', nucleusMaxRadius = None):
+        self.runManager = RunManager(timeOptions=timeOptions, diffusionmodel=diffusionmodel, nucleusMaxRadius=nucleusMaxRadius)
+
+    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=None, version=None):
+        self.nRuns = nRuns
+        self.runManager.nRuns = nRuns
+        if not rereadDamageForNewRuns:
+            self.runManager.Run()
+        else:
+            self.runManager.TotalRuns = self.nRuns
+            self.runManager.plotflag = False
+            for i in range(self.nRuns):
+                self.runManager.nRuns = 1
+                if i == self.nRuns - 1:
+                    self.plotflag = True
+                if i == 0:
+                    self.runManager.Run()
+                else:
+                    self.ReadDamage(basepath, maxDose, version)
+                    self.runManager.Run()
+
+    def ReadDamage(self, basepath, maxDose=2.0, version='2.0'):
+        damage = DamageToDNA()
+        nfiles = len(os.listdir(basepath))
+        # Section to get what directories actually contains both dose and SDD. Disregard others!
+        listOfAvailableDirs = []
+        for j in range(nfiles):
+            newpath = basepath + str(j) + '/'
+            if str(j) in os.listdir(basepath):
+                files = os.listdir(newpath)
+                if 'DNADamage_sdd.txt' in files and 'DNADamage.phsp' in files:
+                    if os.path.getsize(newpath + 'DNADamage_sdd.txt') > 0:  # only those with actual data
+                        listOfAvailableDirs.append(j)
+        neworder = random.sample(listOfAvailableDirs, len(listOfAvailableDirs))
+        for i, e in enumerate(neworder):
+            path = basepath + str(e) + '/'
+            damage.readSDDAndDose(path, version=version)
+        damage.populateDamages(getVideo=False, stopAtDose=maxDose)
+        damage.computeStrandBreaks()
+        print('Irradiation with ' + str(damage.accumulateDose) + ' Gy')
+        print('Initial number of DSB:', str(damage.numDSB))
+        self.runManager.damage = damage
 
 class RunManager:
-    def __init__(self, dam, timeOptions = [], diffusionmodel='free', nucleusMaxRadius = None, dsbrepairmodel='standard', ssbrepairmodel='standard', bdrepairmodel='standard',
-                 outputs=[DSB]):
+    def __init__(self, timeOptions = [], diffusionmodel='free', nucleusMaxRadius = None, dsbrepairmodel='standard', ssbrepairmodel='standard',
+                 bdrepairmodel='standard', outputs=[DSB, MISREPDSB, SSB, BD]):
         if diffusionmodel == 'free':
             self.DiffusionActivated = True
             self.diffusionModel = processes.Diffusion()
@@ -45,9 +91,9 @@ class RunManager:
         else:
             self.clock = Clock(timeOptions[0], timeOptions[1], timeOptions[2])
         self.nucleusMaxRadius = nucleusMaxRadius
-        self.damage = dam
         self.outputs = outputs
-        self.Initialize(dam)
+        self.runoutputDSB = output.AverageTimeCurveOverRuns()
+        self.plotflag = True
 
     def Initialize(self, dam):
         trackid = 0
@@ -103,14 +149,34 @@ class RunManager:
             self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
 
     def Run(self):
-        while self.clock.CurrentTime != self.clock.FinalTime:
-            self.clock.AdvanceTimeStep()
-            self.DoOneStep()
+        self.originaldamage = deepcopy(self.damage)
+        for i in range(self.nRuns):
+            self.repairedList = []
+            self.misrepairedlist = []
+            print('Repair run ' + str(i+1) + ' of ' + str(self.TotalRuns) + '...')
+            self.Initialize(self.damage)
+            if DSB in self.outputs:
+                self.DSBEvolution()
+            while self.clock.CurrentTime != self.clock.FinalTime:
+                self.clock.AdvanceTimeStep()
+                self.DoOneStep()
+            if DSB in self.outputs:
+                self.runoutputDSB.AddTimeCurveForSingleRun(self.outDSB)
+                #self.outDSB.Plot()
+                #self.outDSB.WriteCSV()
+            print('Repaired: ', len(self.repairedList), ' - Misrepaired: ', len(self.misrepairedlist))
+            self.clock.Reset()
+            self.resetDamage()
         if DSB in self.outputs:
-            self.outDSB.Plot()
-            self.outDSB.WriteCSV()
+            self.runoutputDSB.DoStatistics()
+            if self.plotflag:
+                self.runoutputDSB.Plot()
+                self.runoutputDSB.WriteCSV()
 
-    def DoOneStep(self, outputs=['DSB']):
+    def resetDamage(self):
+        self.damage = deepcopy(self.originaldamage)
+
+    def DoOneStep(self):
         if self.DiffusionActivated:
             self.DoDiffusion()
         if self.DSBRepairActivated:
@@ -128,11 +194,11 @@ class RunManager:
             newpos = self.diffusionModel.Diffuse(t.GetLastStep().Position, self.clock.CurrentTimeStep)
             while self._checkPosWithinNucleus(newpos) is False:
                 newpos = self.diffusionModel.Diffuse(t.GetLastStep().Position, self.clock.CurrentTimeStep)
-            newstep = tracking.BeStep(newpos, self.clock.CurrentTime)
+            newstep = tracking.BeStep(newpos, self.clock.CurrentTime, complexity=self.betracks[i].GetLastStep().Complexity)
+            newstep.Status = self.betracks[i].GetLastStep().Status
             self.betracks[i].AddNewStep(newstep)
 
     def DoDSBRepair(self):
-        self.misrepairedlist = []
         repair = self.dsbRepairModel.Repair(self.betracks, self.clock.CurrentTimeStep)
         for i in range(repair.shape[0]):
             for j in range(i+1, repair.shape[1]):
@@ -140,6 +206,7 @@ class RunManager:
                     if self.betracks[i].DSBid == self.betracks[j].DSBid:
                         self.betracks[i].GetLastStep().Status = REPAIRED
                         self.betracks[j].GetLastStep().Status = REPAIRED
+                        self.repairedList.append([self.betracks[i], self.betracks[j]])
                     else:
                         self.betracks[i].GetLastStep().Status = MISREPAIRED
                         self.betracks[j].GetLastStep().Status = MISREPAIRED
@@ -231,6 +298,17 @@ class RunManager:
     def BDRepairActivated(self, b):
         self._bdrepactivated = b
 
+    @property
+    def TotalRuns(self):
+        try:
+            return self._totalruns
+        except:
+            return self.nRuns
+    @TotalRuns.setter
+    def TotalRuns(self, t):
+        self._totalruns = t
+
+
 class Clock:
     def __init__(self, initialTime, finalTime, nSteps, listOfTimePoints = None):
         self.CurrentIndex = 0
@@ -241,6 +319,9 @@ class Clock:
 
     def AdvanceTimeStep(self):
         self.CurrentIndex = self._currentindex + 1
+
+    def Reset(self):
+        self.CurrentIndex = 0
 
     @property
     def CurrentIndex(self):
