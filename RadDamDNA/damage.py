@@ -25,10 +25,10 @@ class DamageToDNA:
         self.accumulateDose = 0
         self.damageMap = {}
         self.Darray = []
-        self.DSBarray = []
-        self.SSBarray = []
-        self.SBarray = []
-        self.BDarray = []
+        self.DSBarray = []; self.DSBdirectarray = []; self.DSBindirectarray = []; self.DSBhybridarray = []
+        self.SSBarray = []; self.SSBdirectarray = []; self.SSBindirectarray = []
+        self.SBarray = []; self.SBdirectarray = []; self.SBindirectarray = []
+        self.BDarray = []; self.BDdirectarray = []; self.BDindirectarray = []
         self.DSBPositions = []
 
     def initializeCounters(self):
@@ -112,10 +112,10 @@ class DamageToDNA:
                 if len(self.doses) > 0:
                     self.accumulateDose += self.doses[iExposure]
                     self.Darray.append(self.accumulateDose)
-                    self.DSBarray.append(self.numDSB)
-                    self.SSBarray.append(self.numSSB)
-                    self.SBarray.append(self.numSB)
-                    self.BDarray.append(self.numBD)
+                    self.DSBarray.append(self.numDSB); self.DSBdirectarray.append(self.numDSBDirect); self.DSBindirectarray.append(self.numDSBIndirect); self.DSBhybridarray.append(self.numDSBHybrid)
+                    self.SSBarray.append(self.numSSB); self.SSBdirectarray.append(self.numSSBDirect); self.SSBindirectarray.append(self.numSSBIndirect)
+                    self.SBarray.append(self.numSB); self.SBdirectarray.append(self.numSBDirect); self.SBindirectarray.append(self.numSBIndirect)
+                    self.BDarray.append(self.numBD); self.BDdirectarray.append(self.numBDDirect); self.BDindirectarray.append(self.numBDIndirect)
                     if getVideo:
                         self.produce3DImage(show=False)
             if damage.newExposure == 1:
@@ -990,6 +990,33 @@ class DamageToDNA:
         elif q.lower() == 'bd':
             y = self.BDarray
             ylabel = 'BD'
+        elif q.lower() == 'dsbd':
+            y = self.DSBdirectarray
+            ylabel = 'Direct DSB'
+        elif q.lower() == 'dsbi':
+            y = self.DSBindirectarray
+            ylabel = 'Indirect DSB'
+        elif q.lower() == 'dsbh':
+            y = self.DSBhybridarray
+            ylabel = 'Hybrid DSB'
+        elif q.lower() == 'ssbd':
+            y = self.SSBdirectarray
+            ylabel = 'Direct SSB'
+        elif q.lower() == 'ssbi':
+            y = self.SSBindirectarray
+            ylabel = 'Indirect SSB'
+        elif q.lower() == 'sbd':
+            y = self.SBdirectarray
+            ylabel = 'Direct SB'
+        elif q.lower() == 'sbi':
+            y = self.SBindirectarray
+            ylabel = 'Indirect SB'
+        elif q.lower() == 'bdd':
+            y = self.BDdirectarray
+            ylabel = 'Direct BD'
+        elif q.lower() == 'bdi':
+            y = self.BDindirectarray
+            ylabel = 'Indirect BD'
         if plot:
             fig = plt.figure()
             fig.set_size_inches((4, 4))
@@ -1003,6 +1030,27 @@ class DamageToDNA:
             fig.tight_layout()
             plt.show()
         return self.Darray, y
+
+    def getDamageClusterDistribution(self, plot=True, savefile=''):
+        n = np.array([])
+        for damage in self.damageSitesAtCurrentTime:
+            numdamages = 0
+            if damage.numberofDSBs > 0:
+                numdamages = damage.numberofstrandbreaks + damage.numberofbasedamages
+                n = np.append(n, numdamages)
+        if plot:
+            # Plot the histogram
+            plt.hist(n, 'auto', density=True, alpha=0.5, color='b')
+            plt.title('Distribution of clusters')
+            plt.xlabel('Number of damages in a cluster')
+            plt.ylabel('Frequency')
+            if not savefile == '':
+                plt.savefig(savefile)
+            else:# Show the plot
+                plt.show()
+        self.meanN = np.mean(n)
+        self.meanWeightedN = np.mean(n**2)/np.mean(n)
+        return n
 
     def getNumberOfFoci(self, fociSize = 0.4):
         indexIsAvailable = []
