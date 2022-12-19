@@ -11,7 +11,7 @@ import random
 from scipy import interpolate
 import pickle
 
-picklefile = '/Users/ai925/source/workspace/repair/yieldData.pickle'
+picklefile = '/Users/ai925/source/workspace/repair/yieldDataProtonsAndxray.pickle'
 readfromdisk = False
 
 fig = plt.figure()
@@ -19,7 +19,7 @@ fig.set_size_inches((12, 12))
 ax = fig.add_subplot(111)
 
 if not readfromdisk:
-    nboot = 40
+    nboot = 15
 
     maxdose = 6.0
 
@@ -28,9 +28,12 @@ if not readfromdisk:
     #energies = ['250keV', '100MeV', '20MeV', '10MeV', '5MeV', '2MeV', '1MeV', '0.8MeV', '8MeV', '6MeV', '4MeV', '2MeV', '1MeV']
     #c = ['black', 'gray', 'slategray', 'skyblue', 'blue', 'green', 'olive', 'orange', 'peru', 'brown', 'salmon', 'red', 'darkred']
 
-    particles = ['alpha', 'alpha', 'alpha', 'alpha', 'alpha']
-    energies = ['8MeV', '6MeV', '4MeV', '2MeV', '1MeV']
-    c = ['black', 'gray', 'red', 'green', 'blue']
+    particles = ['xray', 'proton', 'proton', 'proton', 'proton', 'proton', 'proton', 'proton']
+    energies = ['250keV', '100MeV', '20MeV', '10MeV', '5MeV', '2MeV', '1MeV', '0.8MeV']
+    #particles = ['alpha', 'alpha', 'alpha', 'alpha', 'alpha']
+    #energies = ['8MeV', '6MeV', '4MeV', '2MeV', '1MeV']
+
+    c = ['black', 'gray', 'red', 'green', 'blue', 'orange', 'brown', 'darkred']
     particles.reverse()
     energies.reverse()
     c.reverse()

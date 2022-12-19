@@ -9,9 +9,9 @@ Created on 8/16/22 11:25 AM
 from RadDamDNA.damage import *
 import random
 
-maxdose = 2.0
+maxdose = 0.1
 damage = DamageToDNA()
-basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/alpha/sims/8MeV.txt/'
+basepath = '/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/xrays/sims/250keV.txt/'
 nfiles = len(os.listdir(basepath))
 # Section to get what directories actually contains both dose and SDD. Disregard others!
 listOfAvailableDirs = []
