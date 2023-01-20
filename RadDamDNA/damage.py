@@ -13,7 +13,8 @@ from RadDamDNA.SDD import *
 from collections import defaultdict
 
 class DamageToDNA:
-    def __init__(self):
+    def __init__(self, messages=[]):
+        self.messages = messages
         self.initializeStructures()
         self.initializeCounters()
         self.SetUpColorMap()
@@ -339,6 +340,7 @@ class DamageToDNA:
                     initialBpIds = (bp for bp in basePairs)
                     maxDamage, index = max((d, i) for d, i in zip(linearAccumulatedDamage, initialBpIds))
                     startingBpIdForDamageSites.append(index)
+                    self.assignComplexities(iCh, index, maxDamage)
                     basePairs = [bp for bp in basePairs if bp < index or bp > index + self.nbpForDSB]
                 chromosomeAndInitialBpIdOfDamageSites[iCh] = startingBpIdForDamageSites
             listOfChrAndIniBpIdPertTime.append(chromosomeAndInitialBpIdOfDamageSites)
@@ -918,24 +920,24 @@ class DamageToDNA:
         return string
 
     def printDamageCount(self):
-        print("Summary of damage")
-        print("-----------------")
-        print("Dose", self.accumulateDose, "Gy")
-        print("DSB", self.numDSB)
-        print("DSB_Direct", self.numDSBDirect)
-        print("DSB_Indirect", self.numDSBIndirect)
-        print("DSB_Hybrid", self.numDSBHybrid)
-        print("SSB", self.numSSB)
-        print("SSB_Direct", self.numSSBDirect)
-        print("SSB_Indirect", self.numSSBIndirect)
-        print("SB", self.numSB)
-        print("SB_Direct", self.numSBDirect)
-        print("SB_Indirect", self.numSBIndirect)
-        print("BD", self.numBD)
-        print("BD_Direct", self.numBDDirect)
-        print("BD_Indirect", self.numBDIndirect)
-        print("DSB positions", len(self.DSBPositions))
-        print("Number of foci", self.getNumberOfFoci(0.5))
+        self.messages.append("Summary of damage"); print(self.messages[-1])
+        self.messages.append("-----------------"); print(self.messages[-1])
+        self.messages.append("Dose", self.accumulateDose, "Gy"); print(self.messages[-1])
+        self.messages.append("DSB", self.numDSB); print(self.messages[-1])
+        self.messages.append("DSB_Direct", self.numDSBDirect); print(self.messages[-1])
+        self.messages.append("DSB_Indirect", self.numDSBIndirect); print(self.messages[-1])
+        self.messages.append("DSB_Hybrid", self.numDSBHybrid); print(self.messages[-1])
+        self.messages.append("SSB", self.numSSB); print(self.messages[-1])
+        self.messages.append("SSB_Direct", self.numSSBDirect); print(self.messages[-1])
+        self.messages.append("SSB_Indirect", self.numSSBIndirect); print(self.messages[-1])
+        self.messages.append("SB", self.numSB); print(self.messages[-1])
+        self.messages.append("SB_Direct", self.numSBDirect); print(self.messages[-1])
+        self.messages.append("SB_Indirect", self.numSBIndirect); print(self.messages[-1])
+        self.messages.append("BD", self.numBD); print(self.messages[-1])
+        self.messages.append("BD_Direct", self.numBDDirect); print(self.messages[-1])
+        self.messages.append("BD_Indirect", self.numBDIndirect); print(self.messages[-1])
+        self.messages.append("DSB positions", len(self.DSBPositions)); print(self.messages[-1])
+        self.messages.append("Number of foci", self.getNumberOfFoci(0.5)); print(self.messages[-1])
 
     def getDoseResponseCurve(self, plot=True, q='dsb'):
         if q.lower() == 'dsb':
@@ -1240,4 +1242,4 @@ class SubcomponentLesion:
         self.particletime = particletime
         self.eventID = eventid
         self.dsbID = dsbid
-        self.sitecomplexity = complexity
+        self.complexity = complexity

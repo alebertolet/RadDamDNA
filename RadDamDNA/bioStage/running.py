@@ -28,8 +28,10 @@ SSB = 2
 BD = 3
 
 class Simulator:
-    def __init__(self, timeOptions=[], diffusionmodel='free', nucleusMaxRadius = None):
-        self.runManager = RunManager(timeOptions=timeOptions, diffusionmodel=diffusionmodel, nucleusMaxRadius=nucleusMaxRadius)
+    def __init__(self, timeOptions=[], diffusionmodel='free', dsbmodel='standard', ssbmodel='standard', bdmodel='standard', nucleusMaxRadius = None):
+        self.messages = []
+        self.runManager = RunManager(timeOptions=timeOptions, diffusionmodel=diffusionmodel, dsbrepairmodel=dsbmodel, ssbrepairmodel=ssbmodel,
+                                     bdrepairmodel=bdmodel, nucleusMaxRadius=nucleusMaxRadius, messages=self.messages)
 
     def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=None, version=None):
         self.nRuns = nRuns
@@ -50,7 +52,7 @@ class Simulator:
                     self.runManager.Run()
 
     def ReadDamage(self, basepath, maxDose=2.0, version='2.0'):
-        damage = DamageToDNA()
+        damage = DamageToDNA(messages=self.messages)
         nfiles = len(os.listdir(basepath))
         # Section to get what directories actually contains both dose and SDD. Disregard others!
         listOfAvailableDirs = []
@@ -67,13 +69,18 @@ class Simulator:
             damage.readSDDAndDose(path, version=version)
         damage.populateDamages(getVideo=False, stopAtDose=maxDose)
         damage.computeStrandBreaks()
-        print('Irradiation with ' + str(damage.accumulateDose) + ' Gy')
-        print('Initial number of DSB:', str(damage.numDSB))
+        self.messages.append('Irradiation with ' + str(damage.accumulateDose) + ' Gy'); print(self.messages[-1])
+        self.messages.append('Initial number of DSB: ' + str(damage.numDSB)); print(self.messages[-1])
         self.runManager.damage = damage
 
 class RunManager:
-    def __init__(self, timeOptions = [], diffusionmodel='free', nucleusMaxRadius = None, dsbrepairmodel='standard', ssbrepairmodel='standard',
-                 bdrepairmodel='standard', outputs=[DSB, MISREPDSB, SSB, BD]):
+    def __init__(self, timeOptions = [], diffusionmodel='free', dsbrepairmodel='standard', ssbrepairmodel='standard',
+                 bdrepairmodel='standard', nucleusMaxRadius = None, outputs=[DSB, MISREPDSB, SSB, BD], messages=[]):
+        self.messages = messages
+        self._diffusionactivated = False
+        self._dsbrepactivated = False
+        self._ssbrepactivated = False
+        self._bdrepactivated = False
         if diffusionmodel == 'free':
             self.DiffusionActivated = True
             self.diffusionModel = processes.Diffusion()
@@ -155,7 +162,8 @@ class RunManager:
             self.repairedList = []
             self.misrepairedlist = []
             self.currentrun += 1
-            print('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
+            self.messages.append('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
+            print(self.messages[-1])
             self.Initialize(self.damage)
             if DSB in self.outputs:
                 self.DSBEvolution()
@@ -166,7 +174,8 @@ class RunManager:
                 self.runoutputDSB.AddTimeCurveForSingleRun(self.outDSB)
                 #self.outDSB.Plot()
                 #self.outDSB.WriteCSV()
-            print('Repaired: ', len(self.repairedList), ' - Misrepaired: ', len(self.misrepairedlist))
+            self.messages.append('Repaired: ' + str(len(self.repairedList)) + ' - Misrepaired: ' + str(len(self.misrepairedlist)))
+            print(self.messages[-1])
             self.clock.Reset()
             self.resetDamage()
         if DSB in self.outputs:
