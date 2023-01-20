@@ -73,8 +73,8 @@ if not readfromdisk:
                 path = basepath + str(j) + '/'
                 damage.readSDDAndDose(path, version='1.0')
 
-            damage.populateDamages(stopAtDose=maxdose)
-            damage.computeStrandBreaks()
+            damage.populateDamages(stopAtDose=maxdose, recalculateEveryQuarterOfGray=False, recalculatePerEachTrack=True, classifySites=False)
+            damage.computeStrandBreaks(classifySites=False)
             #damage.printDamageCount()
             dose, dsb = damage.getDoseResponseCurve(plot=False, q='dsb')
             dose, ssb = damage.getDoseResponseCurve(plot=False, q='ssb')
