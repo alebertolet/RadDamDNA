@@ -28,14 +28,19 @@ SSB = 2
 BD = 3
 
 class Simulator:
-    def __init__(self, timeOptions=[], diffusionmodel='free', dsbmodel='standard', ssbmodel='standard', bdmodel='standard', nucleusMaxRadius = None):
+    def __init__(self, timeOptions=[], diffusionmodel='free', dsbmodel='standard', ssbmodel='standard', bdmodel='standard', nucleusMaxRadius = None,
+                 irradiationTime=0, doseratefunction=None, doseratefunctionargs=None):
         self.messages = []
+        self.irradiationTime = irradiationTime
+        self.doseratefunction = doseratefunction
+        self.doseratefunctionargs = doseratefunctionargs
         self.runManager = RunManager(timeOptions=timeOptions, diffusionmodel=diffusionmodel, dsbrepairmodel=dsbmodel, ssbrepairmodel=ssbmodel,
                                      bdrepairmodel=bdmodel, nucleusMaxRadius=nucleusMaxRadius, messages=self.messages)
 
-    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=None, version=None):
+    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None):
         self.nRuns = nRuns
         self.runManager.nRuns = nRuns
+        self.runManager.maxDose = maxDose
         if not rereadDamageForNewRuns:
             self.runManager.Run()
         else:
@@ -64,23 +69,41 @@ class Simulator:
                     if os.path.getsize(newpath + 'DNADamage_sdd.txt') > 0:  # only those with actual data
                         listOfAvailableDirs.append(j)
         neworder = random.sample(listOfAvailableDirs, len(listOfAvailableDirs))
+        accumulatedose = 0
         for i, e in enumerate(neworder):
+            accumulatedose = damage.accumulateDose
+            time = self.getTimeForDose(accumulatedose)
+            if 0 < self.irradiationTime < time:
+                time = 1e20
             path = basepath + str(e) + '/'
-            damage.readSDDAndDose(path, version=version)
-        damage.populateDamages(getVideo=False, stopAtDose=maxDose)
-        damage.computeStrandBreaks()
-        self.messages.append('Irradiation with ' + str(damage.accumulateDose) + ' Gy'); print(self.messages[-1])
-        self.messages.append('Initial number of DSB: ' + str(damage.numDSB)); print(self.messages[-1])
+            damage.readSDDAndDose(path, version=version, particleTime=time, lesionTime=time)
+        damage.populateDamages(getVideo=False, stopAtDose=maxDose, stopAtTime=0)
         self.runManager.damage = damage
+
+    def getTimeForDose(self, d):
+        if self.irradiationTime == 0:
+            return 0
+        if self.doseratefunction is None:
+            return 0
+        if self.doseratefunction == 'uniform':
+            return d / self.doseratefunctionargs[0]
+        if self.doseratefunction == 'linear':
+            return (-self.doseratefunction[0] + np.sqrt(self.doseratefunction[0] ** 2 + 4 * self.doseratefunction[1] * d)) / (2 * self.doseratefunction[1])
+        if self.doseratefunction == 'exponential':
+            constant = np.log(2) / self.doseratefunctionargs[1]
+            initialdoserate = self.doseratefunctionargs[0]
+            return -1/constant * np.log(1-d/(initialdoserate/constant))
 
 class RunManager:
     def __init__(self, timeOptions = [], diffusionmodel='free', dsbrepairmodel='standard', ssbrepairmodel='standard',
                  bdrepairmodel='standard', nucleusMaxRadius = None, outputs=[DSB, MISREPDSB, SSB, BD], messages=[]):
         self.messages = messages
+        self.maxDose = -1
         self._diffusionactivated = False
         self._dsbrepactivated = False
         self._ssbrepactivated = False
         self._bdrepactivated = False
+        self.trackid = 0
         if diffusionmodel == 'free':
             self.DiffusionActivated = True
             self.diffusionModel = processes.Diffusion()
@@ -103,8 +126,7 @@ class RunManager:
         self.plotflag = True
         self.currentrun = 0
 
-    def Initialize(self, dam):
-        trackid = 0
+    def InitializeNewTracks(self, dam):
         self.betracks = []
         self.ssbdamages = []
         self.bdamages = []
@@ -114,47 +136,47 @@ class RunManager:
                     if dam.DSBMap[iCh][iBp][iCo].type > 0:
                         pos = dam.DSBMap[iCh][iBp][iCo].position
                         time = dam.DSBMap[iCh][iBp][iCo].particletime
-                        newBeStep = tracking.BeStep(pos, time, complexity=dam.DSBMap[iCh][iBp][iCo].complexity)
-                        newBeTrack = tracking.BeTrack(trackid, dam.DSBMap[iCh][iBp][iCo].dsbID)
-                        newBeTrack.ChromosomeID = iCh
-                        newBeTrack.BasePairID = iBp
-                        newBeTrack.StrandID = iCo
-                        newBeTrack.AddNewStep(newBeStep)
-                        self.betracks.append(newBeTrack)
-                        trackid += 1
+                        if time <= self.clock.CurrentTime and time > self.clock.CurrentTime - self.clock.CurrentTimeStep:
+                            newBeStep = tracking.BeStep(pos, time, complexity=dam.DSBMap[iCh][iBp][iCo].complexity)
+                            newBeTrack = tracking.BeTrack(self.trackid, dam.DSBMap[iCh][iBp][iCo].dsbID)
+                            newBeTrack.ChromosomeID = iCh
+                            newBeTrack.BasePairID = iBp
+                            newBeTrack.StrandID = iCo
+                            newBeTrack.AddNewStep(newBeStep)
+                            self.betracks.append(newBeTrack)
+                            self.trackid += 1
         for iCh in dam.SSBMap:
             for iBp in dam.SSBMap[iCh]:
                 for iCo in dam.SSBMap[iCh][iBp]:
                     if dam.SSBMap[iCh][iBp][iCo].type > 0:
                         pos = dam.SSBMap[iCh][iBp][iCo].position
                         time = dam.SSBMap[iCh][iBp][iCo].particletime
-                        newSSBDamage = tracking.DamageTrack(trackid)
-                        newSSBDamage.Time = time
-                        newSSBDamage.Position = pos
-                        newSSBDamage.ChromosomeID = iCh
-                        newSSBDamage.BasePairID = iBp
-                        newSSBDamage.StrandID = iCo
-                        newSSBDamage.Complexity = dam.SSBMap[iCh][iBp][iCo].complexity
-                        self.ssbdamages.append(newSSBDamage)
-                        trackid += 1
+                        if time <= self.clock.CurrentTime and time > self.clock.CurrentTime - self.clock.CurrentTimeStep:
+                            newSSBDamage = tracking.DamageTrack(self.trackid)
+                            newSSBDamage.Time = time
+                            newSSBDamage.Position = pos
+                            newSSBDamage.ChromosomeID = iCh
+                            newSSBDamage.BasePairID = iBp
+                            newSSBDamage.StrandID = iCo
+                            newSSBDamage.Complexity = dam.SSBMap[iCh][iBp][iCo].complexity
+                            self.ssbdamages.append(newSSBDamage)
+                            self.trackid += 1
         for iCh in dam.BDMap:
             for iBp in dam.BDMap[iCh]:
                 for iCo in dam.BDMap[iCh][iBp]:
                     if dam.BDMap[iCh][iBp][iCo].type > 0:
                         pos = dam.BDMap[iCh][iBp][iCo].position
                         time = dam.BDMap[iCh][iBp][iCo].particletime
-                        newBDDamage = tracking.DamageTrack(trackid)
-                        newBDDamage.Time = time
-                        newBDDamage.Position = pos
-                        newBDDamage.ChromosomeID = iCh
-                        newBDDamage.BasePairID = iBp
-                        newBDDamage.StrandID = iCo
-                        newBDDamage.Complexity = dam.BDMap[iCh][iBp][iCo].complexity
-                        self.bdamages.append(newBDDamage)
-                        trackid += 1
-        # Initialize outputs
-        if DSB in self.outputs:
-            self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
+                        if time <= self.clock.CurrentTime and time > self.clock.CurrentTime - self.clock.CurrentTimeStep:
+                            newBDDamage = tracking.DamageTrack(self.trackid)
+                            newBDDamage.Time = time
+                            newBDDamage.Position = pos
+                            newBDDamage.ChromosomeID = iCh
+                            newBDDamage.BasePairID = iBp
+                            newBDDamage.StrandID = iCo
+                            newBDDamage.Complexity = dam.BDMap[iCh][iBp][iCo].complexity
+                            self.bdamages.append(newBDDamage)
+                            self.trackid += 1
 
     def Run(self):
         self.originaldamage = deepcopy(self.damage)
@@ -164,10 +186,13 @@ class RunManager:
             self.currentrun += 1
             self.messages.append('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
             print(self.messages[-1])
-            self.Initialize(self.damage)
             if DSB in self.outputs:
+                self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
                 self.DSBEvolution()
             while self.clock.CurrentTime != self.clock.FinalTime:
+                print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h - Dose: " + str(self.damage.cumulativeDose) + " Gy")
+                print("Number of DSB: " + str(self.damage.numDSB))
+                self.InitializeNewTracks(self.damage)
                 self.clock.AdvanceTimeStep()
                 self.DoOneStep()
             if DSB in self.outputs:
@@ -256,7 +281,7 @@ class RunManager:
                 if iCo == 2:
                     iCo = 4
                 self.damage.damageMap[iCh][iBp][iCo].type = 0
-        self.damage.recomputeDamagesFromReadSites(stopAtTime=self.clock.CurrentTime)
+        self.damage.recomputeDamagesFromReadSites(stopAtTime=self.clock.CurrentTime, stopAtDose=self.maxDose)
 
     def DSBEvolution(self):
         self.outDSB.AddTimePoint(self.clock.CurrentTime, self.damage.numDSB)

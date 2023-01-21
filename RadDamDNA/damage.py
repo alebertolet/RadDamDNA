@@ -19,12 +19,13 @@ class DamageToDNA:
         self.initializeCounters()
         self.SetUpColorMap()
         self.stopAtDose = -1.0
+        self.accumulateDose = 0
+        self.cumulativeDose = 0
 
     def initializeStructures(self):
         self.damageSites = []
         self.damageSitesAtCurrentTime = []
         self.doses = np.array([])
-        self.accumulateDose = 0
         self.damageMap = {}
         self.Darray = []
         self.DSBarray = []; self.DSBdirectarray = []; self.DSBindirectarray = []; self.DSBhybridarray = []
@@ -48,6 +49,7 @@ class DamageToDNA:
             for l in lines:
                 split = l.split()
                 self.doses = np.append(self.doses, float(split[1]))
+                self.accumulateDose += self.doses[-1]
         sddpath = path + namessd
         self.readFromSDD(sddpath, version, particleTime, lesionTime)
         f.close()
@@ -70,7 +72,7 @@ class DamageToDNA:
 
     def recomputeDamagesFromReadSites(self, stopAtDose = -1, stopAtTime = -1):
         self.recomputeSitesAtCurrentTime()
-        self.populateDamages(False, stopAtDose, stopAtTime)
+        self.populateDamages(stopAtDose, stopAtTime)
         self.computeStrandBreaks()
 
     def populateDamages(self, stopAtDose = -1, stopAtTime = -1, recalculatePerEachTrack=False, recalculateEveryQuarterOfGray=False,
@@ -84,16 +86,16 @@ class DamageToDNA:
         # Handling a parallel list of damage sites considering time
         damageSites = self.damageSites.copy()
         if stopAtTime == -1:
-            for damage in damageSites:
-                self.damageSitesAtCurrentTime.append(damage) # These damages can be modified by repair
+            self.damageSitesAtCurrentTime = damageSites.copy()
         else:
-            for damage in damageSites:
-                if damage.LesionTime <= stopAtTime:
-                    self.damageSitesAtCurrentTime.append(damage)
+            for d in damageSites:
+                if d.LesionTime <= stopAtTime:
+                    self.damageSitesAtCurrentTime.insert(0, d)
         del(damageSites)
+        # Initialize the damage map
         dosefromlastrecalculation = 0
         for id, damage in enumerate(self.damageSitesAtCurrentTime):
-            if (0 <= self.stopAtDose < self.accumulateDose) or damage not in self.damageSites:
+            if (0 <= self.stopAtDose < self.cumulativeDose) or damage.isRepaired:
                 self.computeStrandBreaks()
                 break
             iCh = damage.chromosomeNumber
@@ -110,11 +112,11 @@ class DamageToDNA:
             if (id < len(self.damageSitesAtCurrentTime) - 1 and self.damageSitesAtCurrentTime[id + 1].newExposure > 1) or id == len(self.damageSitesAtCurrentTime) - 1:
                 iExposure += 1
                 iEvent += 1
-                if recalculatePerEachTrack:
+                if recalculatePerEachTrack or id == len(self.damageSitesAtCurrentTime) - 1:
                     self.computeStrandBreaks(classifySites=classifySites)
                     dosefromlastrecalculation = 0
                 if len(self.doses) > 0:
-                    self.accumulateDose += self.doses[iExposure]
+                    self.cumulativeDose += self.doses[iExposure]
                     dosefromlastrecalculation += self.doses[iExposure]
                     if recalculateEveryQuarterOfGray and dosefromlastrecalculation >= 0.25:
                         self.computeStrandBreaks(classifySites=classifySites)
@@ -266,9 +268,87 @@ class DamageToDNA:
                     self.BDMap[iCh][iBp][1] = SubcomponentLesion(self.damageMap[iCh][iBp][1].type, self.damageMap[iCh][iBp][1].position, self.damageMap[iCh][iBp][1].lesiontime, self.damageMap[iCh][iBp][1].particletime)
                 if 4 in self.damageMap[iCh][iBp].keys() and self.damageMap[iCh][iBp][4].type > 0:
                     self.BDMap[iCh][iBp][2] = SubcomponentLesion(self.damageMap[iCh][iBp][4].type, self.damageMap[iCh][iBp][4].position, self.damageMap[iCh][iBp][4].lesiontime, self.damageMap[iCh][iBp][4].particletime)
+        # Remove all entries with no damage
+        # DSB Map
+        keys_to_remove = []
+        for iCh in self.DSBMap.keys():
+            for iBp in self.DSBMap[iCh].keys():
+                if self.DSBMap[iCh][iBp][1].type == 0 and self.DSBMap[iCh][iBp][2].type == 0:
+                    keys_to_remove.append((iCh, iBp))
+        for key in keys_to_remove:
+            del self.DSBMap[key[0]][key[1]]
+        keys_to_remove = []
+        for iCh in self.DSBMap.keys():
+            if len(self.DSBMap[iCh]) == 0:
+                keys_to_remove.append(iCh)
+        for key in keys_to_remove:
+            del self.DSBMap[key]
+
+        # SSB Map
+        keys_to_remove = []
+        for iCh in self.SSBMap.keys():
+            for iBp in self.SSBMap[iCh].keys():
+                if 1 in self.SSBMap[iCh][iBp].keys() and self.SSBMap[iCh][iBp][1].type == 0:
+                    keys_to_remove.append((iCh, iBp, 1))
+                if 2 in self.SSBMap[iCh][iBp].keys() and self.SSBMap[iCh][iBp][2].type == 0:
+                    keys_to_remove.append((iCh, iBp, 2))
+        for key in keys_to_remove:
+            del self.SSBMap[key[0]][key[1]][key[2]]
+        keys_to_remove = []
+        for iCh in self.SSBMap.keys():
+            for iBp in self.SSBMap[iCh].keys():
+                if len(self.SSBMap[iCh][iBp]) == 0:
+                    keys_to_remove.append((iCh, iBp))
+        for key in keys_to_remove:
+            del self.SSBMap[key[0]][key[1]]
+        keys_to_remove = []
+        for iCh in self.SSBMap.keys():
+            if len(self.SSBMap[iCh]) == 0:
+                keys_to_remove.append(iCh)
+        for key in keys_to_remove:
+            del self.SSBMap[key]
+
+        # BD Map
+        keys_to_remove = []
+        for iCh in self.BDMap.keys():
+            for iBp in self.BDMap[iCh].keys():
+                if 1 in self.BDMap[iCh][iBp].keys() and self.BDMap[iCh][iBp][1].type == 0:
+                    keys_to_remove.append((iCh, iBp, 1))
+                if 2 in self.BDMap[iCh][iBp].keys() and self.BDMap[iCh][iBp][2].type == 0:
+                    keys_to_remove.append((iCh, iBp, 2))
+        for key in keys_to_remove:
+            del self.BDMap[key[0]][key[1]][key[2]]
+        keys_to_remove = []
+        for iCh in self.BDMap.keys():
+            for iBp in self.BDMap[iCh].keys():
+                if len(self.BDMap[iCh][iBp]) == 0:
+                    keys_to_remove.append((iCh, iBp))
+        for key in keys_to_remove:
+            del self.BDMap[key[0]][key[1]]
+        keys_to_remove = []
+        for iCh in self.BDMap.keys():
+            if len(self.BDMap[iCh]) == 0:
+                keys_to_remove.append(iCh)
+        for key in keys_to_remove:
+            del self.BDMap[key]
+
+        # DSB pairs
+        keys_to_remove = []
+        for iCh in DSBPairs.keys():
+            for iBp in DSBPairs[iCh].keys():
+                if DSBPairs[iCh][iBp] == 0:
+                    keys_to_remove.append((iCh, iBp))
+        for key in keys_to_remove:
+            del DSBPairs[key[0]][key[1]]
+        keys_to_remove = []
+        for iCh in DSBPairs.keys():
+            if DSBPairs[iCh] == {}:
+                keys_to_remove.append(iCh)
+        for key in keys_to_remove:
+            del DSBPairs[key]
         self.quantifyDamage(DSBPairs, self.SSBMap, self.BDMap)
         if classifySites:
-            self.classifiedDamageSites = self.classifyDamageSites()
+            self.classifiedDamage = self.classifyDamageSites()
 
     def quantifyDamage(self, DSBPairs, SSBMap, BDMap):
         self.initializeCounters()
@@ -307,44 +387,41 @@ class DamageToDNA:
                             self.numBDIndirect += 1
 
     def classifyDamageSites(self):
-        times = self.getParticleTimes()
-        listOfChrAndIniBpIdPertTime = []
-        for time in times:
-            damageScore = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
-            for iCh, bdMap in self.BDMap.items():
-                for iBp, bdCoMap in bdMap.items():
-                    for iCo, bd in bdCoMap.items():
-                        if bd.type > 0 and bd.particletime == time:
-                            damageScore[iCh][iBp][iCo] += 0.001
-            for iCh, ssbMap in self.SSBMap.items():
-                for iBp, ssbCoMap in ssbMap.items():
-                    for iCo, ssb in ssbCoMap.items():
-                        if ssb.type > 0 and ssb.particletime == time:
-                            damageScore[iCh][iBp][iCo] += 0.1
-            for iCh, dsbMap in self.DSBMap.items():
-                for iBp, dsbCoMap in dsbMap.items():
-                    for iCo, dsb in dsbCoMap.items():
-                        if dsb.type > 0 and dsb.particletime == time:
-                            damageScore[iCh][iBp][iCo] += 5.0
+        damageScore = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+        for iCh, bdMap in self.BDMap.items():
+            for iBp, bdCoMap in bdMap.items():
+                for iCo, bd in bdCoMap.items():
+                    if bd.type > 0:
+                        damageScore[iCh][iBp][iCo] += 0.001
+        for iCh, ssbMap in self.SSBMap.items():
+            for iBp, ssbCoMap in ssbMap.items():
+                for iCo, ssb in ssbCoMap.items():
+                    if ssb.type > 0:
+                        damageScore[iCh][iBp][iCo] += 0.1
+        for iCh, dsbMap in self.DSBMap.items():
+            for iBp, dsbCoMap in dsbMap.items():
+                for iCo, dsb in dsbCoMap.items():
+                    if dsb.type > 0:
+                        damageScore[iCh][iBp][iCo] += 5.0
 
-            chromosomeAndInitialBpIdOfDamageSites = {}
-            maxDamage = 10 * self.nbpForDSB
-            minDamage = 1e-8
-            # Optimize
-            for iCh, damageScoreCh in damageScore.items():
-                startingBpIdForDamageSites = []
-                basePairs = list(damageScoreCh.keys())
-                while maxDamage > minDamage and len(basePairs) != 0:
-                    linearAccumulatedDamage = (sum(damageScoreCh[bp + i][1] + damageScoreCh[bp + i][2] for i in range(self.nbpForDSB))
-                        for bp in basePairs)
-                    initialBpIds = (bp for bp in basePairs)
-                    maxDamage, index = max((d, i) for d, i in zip(linearAccumulatedDamage, initialBpIds))
-                    startingBpIdForDamageSites.append(index)
-                    self.assignComplexities(iCh, index, maxDamage)
-                    basePairs = [bp for bp in basePairs if bp < index or bp > index + self.nbpForDSB]
-                chromosomeAndInitialBpIdOfDamageSites[iCh] = startingBpIdForDamageSites
-            listOfChrAndIniBpIdPertTime.append(chromosomeAndInitialBpIdOfDamageSites)
-        return listOfChrAndIniBpIdPertTime
+        chromosomeAndInitialBpIdOfDamageSites = {}
+        maxDamage = 10 * self.nbpForDSB
+        minDamage = 1e-8
+        # Optimize
+        for iCh, damageScoreCh in damageScore.items():
+            startingBpIdForDamageSites = []
+            basePairs = list(damageScoreCh.keys())
+            while maxDamage > minDamage and len(basePairs) != 0:
+                linearAccumulatedDamage = (sum(damageScoreCh[bp + i][1] + damageScoreCh[bp + i][2] for i in range(self.nbpForDSB))
+                    for bp in basePairs)
+                initialBpIds = (bp for bp in basePairs)
+                maxDamage, index = max((d, i) for d, i in zip(linearAccumulatedDamage, initialBpIds))
+                startingBpIdForDamageSites.append(index)
+                for i in range(self.nbpForDSB):
+                    self.assignComplexities(iCh, index + i, maxDamage)
+                basePairs = [bp for bp in basePairs if bp < index or bp > index + self.nbpForDSB]
+            chromosomeAndInitialBpIdOfDamageSites[iCh] = startingBpIdForDamageSites
+        return chromosomeAndInitialBpIdOfDamageSites
 
     def assignComplexities(self, iChr, iBp, damage):
         for i in range(self.nbpForDSB):
@@ -368,160 +445,160 @@ class DamageToDNA:
                         self.DSBMap[iChr][iBp+i][2].complexity = damage
 
     def recomputeSitesAtCurrentTime(self):
-        sitespertime = self.classifiedDamageSites
+        sitesatcurrentime = self.classifiedDamage
         numSites = 0
         firstExposure = True
+        newEvent = True
         self.damageSitesAtCurrentTime.clear()
-        for siteinfo in sitespertime:
-            newsite = SDDDamageSite()
-            newEvent = True
-            for iCh in siteinfo.keys():
-                ibpsTakenForThisChromosome = []
-                for i in range(len(siteinfo[iCh])):
-                    initialBpId = siteinfo[iCh][i]
-                    dir = 0; indir = 0
-                    bd = 0; sb = 0; dsb = 0
-                    for j in range(self.nbpForDSB):
-                        if initialBpId + j not in ibpsTakenForThisChromosome:
-                            if iCh in self.SSBMap.keys():
-                                if initialBpId + j in self.SSBMap[iCh].keys():
-                                    if 1 in self.SSBMap[iCh][initialBpId + j].keys():
-                                        if self.SSBMap[iCh][initialBpId + j][1] == 1 or self.SSBMap[iCh][initialBpId + j][1].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                        if self.SSBMap[iCh][initialBpId + j][1] == 2:
-                                            indir += 1
-                                            sb += 1
-                                    if 2 in self.SSBMap[iCh][initialBpId + j].keys():
-                                        if self.SSBMap[iCh][initialBpId + j][2] == 1 or self.SSBMap[iCh][initialBpId + j][2].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                        if self.SSBMap[iCh][initialBpId + j][2] == 2:
-                                            indir += 1
-                                            sb += 1
-                            if iCh in self.DSBMap.keys():
-                                if initialBpId + j in self.DSBMap[iCh].keys():
-                                    if 1 in self.DSBMap[iCh][initialBpId + j].keys():
-                                        if self.DSBMap[iCh][initialBpId + j][1].type == 1 or self.DSBMap[iCh][initialBpId + j][1].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                            dsb += 1
-                                        if self.DSBMap[iCh][initialBpId + j][1].type == 2:
-                                            indir += 1
-                                            sb += 1
-                                            dsb += 1
-                                    if 2 in self.DSBMap[iCh][initialBpId + j].keys():
-                                        if self.DSBMap[iCh][initialBpId + j][2].type == 1 or self.DSBMap[iCh][initialBpId + j][2].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                        if self.DSBMap[iCh][initialBpId + j][2].type == 2:
-                                            indir += 1
-                                            sb += 1
-                            if iCh in self.BDMap.keys():
-                                if initialBpId + j in self.BDMap[iCh].keys():
-                                    if 1 in self.BDMap[iCh][initialBpId + j].keys():
-                                        if self.BDMap[iCh][initialBpId + j][1].type == 1 or self.BDMap[iCh][initialBpId + j][1].type == 3:
-                                            dir += 1
-                                            bd += 1
-                                        if self.BDMap[iCh][initialBpId + j][1].type == 2:
-                                            indir += 1
-                                            bd += 1
-                                    if 2 in self.BDMap[iCh][initialBpId + j].keys():
-                                        if self.BDMap[iCh][initialBpId + j][2].type == 1 or self.BDMap[iCh][initialBpId + j][2].type == 3:
-                                            dir += 1
-                                            bd += 1
-                                        if self.BDMap[iCh][initialBpId + j][2].type == 2:
-                                            indir += 1
-                                            bd += 1
-                        ibpsTakenForThisChromosome.append(initialBpId + j)
-                    numSites += 1
-                    #Field 1
-                    newExposureFlag = str(0)
-                    if newEvent:
-                        newExposureFlag = str(1)
-                        newEvent = False
-                    if firstExposure:
-                        newExposureFlag = str(2)
-                        firstExposure = False
-                    newsite.Classification = [newExposureFlag, 0]
-                    #Field 2
-                    damagePositions = []
-                    for j in range(self.nbpForDSB):
-                        if iCh in self.damageMap.keys():
-                            if initialBpId + j in self.damageMap[iCh].keys():
-                                if 1 in self.damageMap[iCh][initialBpId + j].keys():
-                                    damagePositions.append(self.damageMap[iCh][initialBpId + j][1].position)
-                                if 2 in self.damageMap[iCh][initialBpId + j].keys():
-                                    damagePositions.append(self.damageMap[iCh][initialBpId + j][2].position)
-                                if 3 in self.damageMap[iCh][initialBpId + j].keys():
-                                    damagePositions.append(self.damageMap[iCh][initialBpId + j][3].position)
-                                if 4 in self.damageMap[iCh][initialBpId + j].keys():
-                                    damagePositions.append(self.damageMap[iCh][initialBpId + j][4].position)
-                    if len(damagePositions) > 0:
-                        damageCenterMaxMin = self.getDamageCenterAndBoundaries(np.array(damagePositions))
-                        center = damageCenterMaxMin[0]
-                        max = damageCenterMaxMin[1]
-                        min = damageCenterMaxMin[2]
-                        newsite.SpatialCoordinatesAndExtent = [center[0], center[1], center[2], max[0], max[1], max[2], min[0], min[1], min[2]]
-                    # Field 3
-                    newsite.ChromosomeID = [1, iCh, 1, 0]
-                    # Field 4
-                    chromosomeLength = self.Chromosomesizes[iCh]
-                    damageChromPos = initialBpId / chromosomeLength / 1e6
-                    newsite.ChromosomePosition = float("{:.12f}".format(damageChromPos))
-                    # Field 5
-                    typeDamage = 0
-                    if dir == 0 and indir > 0:
-                        typeDamage = 1
-                    if dir > 0 and indir > 0:
-                        typeDamage = 2
-                    newsite.Cause = [typeDamage, dir, indir]
-                    # Field 6
-                    newsite.DamageTypes = [bd, sb, dsb]
-                    # Field 7
-                    damageSpec = []
-                    for j in range(0, self.nbpForDSB):
-                        if iCh in self.damageMap.keys():
-                            if initialBpId + j in self.damageMap[iCh].keys():
-                                if 2 in self.damageMap[iCh][initialBpId + j].keys():
-                                    typeDamage = self.damageMap[iCh][initialBpId + j][2].type
-                                    if typeDamage <= 0:
-                                        typeDamage = 0
-                                    damageSpec.append(1)
-                                    damageSpec.append(j+1)
-                                    damageSpec.append(typeDamage)
-                    for j in range(0, self.nbpForDSB):
-                        if iCh in self.damageMap.keys():
-                            if initialBpId + j in self.damageMap[iCh].keys():
-                                if 1 in self.damageMap[iCh][initialBpId + j].keys():
-                                    typeDamage = self.damageMap[iCh][initialBpId + j][1].type
-                                    if typeDamage <= 0:
-                                        typeDamage = 0
-                                    damageSpec.append(2)
-                                    damageSpec.append(j+1)
-                                    damageSpec.append(typeDamage)
-                    for j in range(0, self.nbpForDSB):
-                        if iCh in self.damageMap.keys():
-                            if initialBpId + j in self.damageMap[iCh].keys():
-                                if 4 in self.damageMap[iCh][initialBpId + j].keys():
-                                    typeDamage = self.damageMap[iCh][initialBpId + j][4].type
-                                    if typeDamage <= 0:
-                                        typeDamage = 0
-                                    damageSpec.append(3)
-                                    damageSpec.append(j+1)
-                                    damageSpec.append(typeDamage)
-                    for j in range(0, self.nbpForDSB):
-                        if iCh in self.damageMap.keys():
-                            if initialBpId + j in self.damageMap[iCh].keys():
-                                if 3 in self.damageMap[iCh][initialBpId + j].keys():
-                                    typeDamage = self.damageMap[iCh][initialBpId + j][3].type
-                                    if typeDamage <= 0:
-                                        typeDamage = 0
-                                    damageSpec.append(4)
-                                    damageSpec.append(j+1)
-                                    damageSpec.append(typeDamage)
-                    newsite.FullBreakSpec = damageSpec
-            self.damageSitesAtCurrentTime.append(newsite)
+        for iCh in sitesatcurrentime.keys():
+            ibpsTakenForThisChromosome = []
+            for i in range(len(sitesatcurrentime[iCh])):
+                newsite = SDDDamageSite()
+                newsite.isRepaired = True
+                initialBpId = sitesatcurrentime[iCh][i]
+                dir = 0; indir = 0
+                bd = 0; sb = 0; dsb = 0
+                for j in range(self.nbpForDSB):
+                    if initialBpId + j not in ibpsTakenForThisChromosome:
+                        if iCh in self.SSBMap.keys():
+                            if initialBpId + j in self.SSBMap[iCh].keys():
+                                if 1 in self.SSBMap[iCh][initialBpId + j].keys():
+                                    if self.SSBMap[iCh][initialBpId + j][1] == 1 or self.SSBMap[iCh][initialBpId + j][1].type == 3:
+                                        dir += 1
+                                        sb += 1
+                                    if self.SSBMap[iCh][initialBpId + j][1] == 2:
+                                        indir += 1
+                                        sb += 1
+                                if 2 in self.SSBMap[iCh][initialBpId + j].keys():
+                                    if self.SSBMap[iCh][initialBpId + j][2] == 1 or self.SSBMap[iCh][initialBpId + j][2].type == 3:
+                                        dir += 1
+                                        sb += 1
+                                    if self.SSBMap[iCh][initialBpId + j][2] == 2:
+                                        indir += 1
+                                        sb += 1
+                        if iCh in self.DSBMap.keys():
+                            if initialBpId + j in self.DSBMap[iCh].keys():
+                                if 1 in self.DSBMap[iCh][initialBpId + j].keys():
+                                    if self.DSBMap[iCh][initialBpId + j][1].type == 1 or self.DSBMap[iCh][initialBpId + j][1].type == 3:
+                                        dir += 1
+                                        sb += 1
+                                        dsb += 1
+                                    if self.DSBMap[iCh][initialBpId + j][1].type == 2:
+                                        indir += 1
+                                        sb += 1
+                                        dsb += 1
+                                if 2 in self.DSBMap[iCh][initialBpId + j].keys():
+                                    if self.DSBMap[iCh][initialBpId + j][2].type == 1 or self.DSBMap[iCh][initialBpId + j][2].type == 3:
+                                        dir += 1
+                                        sb += 1
+                                    if self.DSBMap[iCh][initialBpId + j][2].type == 2:
+                                        indir += 1
+                                        sb += 1
+                        if iCh in self.BDMap.keys():
+                            if initialBpId + j in self.BDMap[iCh].keys():
+                                if 1 in self.BDMap[iCh][initialBpId + j].keys():
+                                    if self.BDMap[iCh][initialBpId + j][1].type == 1 or self.BDMap[iCh][initialBpId + j][1].type == 3:
+                                        dir += 1
+                                        bd += 1
+                                    if self.BDMap[iCh][initialBpId + j][1].type == 2:
+                                        indir += 1
+                                        bd += 1
+                                if 2 in self.BDMap[iCh][initialBpId + j].keys():
+                                    if self.BDMap[iCh][initialBpId + j][2].type == 1 or self.BDMap[iCh][initialBpId + j][2].type == 3:
+                                        dir += 1
+                                        bd += 1
+                                    if self.BDMap[iCh][initialBpId + j][2].type == 2:
+                                        indir += 1
+                                        bd += 1
+                    ibpsTakenForThisChromosome.append(initialBpId + j)
+                numSites += 1
+                #Field 1
+                newExposureFlag = str(0)
+                if newEvent:
+                    newExposureFlag = str(1)
+                    newEvent = False
+                if firstExposure:
+                    newExposureFlag = str(2)
+                    firstExposure = False
+                newsite.Classification = [newExposureFlag, 0]
+                #Field 2
+                damagePositions = []
+                for j in range(self.nbpForDSB):
+                    if iCh in self.damageMap.keys():
+                        if initialBpId + j in self.damageMap[iCh].keys():
+                            if 1 in self.damageMap[iCh][initialBpId + j].keys():
+                                damagePositions.append(self.damageMap[iCh][initialBpId + j][1].position)
+                            if 2 in self.damageMap[iCh][initialBpId + j].keys():
+                                damagePositions.append(self.damageMap[iCh][initialBpId + j][2].position)
+                            if 3 in self.damageMap[iCh][initialBpId + j].keys():
+                                damagePositions.append(self.damageMap[iCh][initialBpId + j][3].position)
+                            if 4 in self.damageMap[iCh][initialBpId + j].keys():
+                                damagePositions.append(self.damageMap[iCh][initialBpId + j][4].position)
+                if len(damagePositions) > 0:
+                    damageCenterMaxMin = self.getDamageCenterAndBoundaries(np.array(damagePositions))
+                    center = damageCenterMaxMin[0]
+                    max = damageCenterMaxMin[1]
+                    min = damageCenterMaxMin[2]
+                    newsite.SpatialCoordinatesAndExtent = [center[0], center[1], center[2], max[0], max[1], max[2], min[0], min[1], min[2]]
+                # Field 3
+                newsite.ChromosomeID = [1, iCh, 1, 0]
+                # Field 4
+                chromosomeLength = self.Chromosomesizes[iCh]
+                damageChromPos = initialBpId / chromosomeLength / 1e6
+                newsite.ChromosomePosition = float("{:.12f}".format(damageChromPos))
+                # Field 5
+                typeDamage = 0
+                if dir == 0 and indir > 0:
+                    typeDamage = 1
+                if dir > 0 and indir > 0:
+                    typeDamage = 2
+                newsite.Cause = [typeDamage, dir, indir]
+                # Field 6
+                newsite.DamageTypes = [bd, sb, dsb]
+                # Field 7
+                damageSpec = []
+                for j in range(0, self.nbpForDSB):
+                    if iCh in self.damageMap.keys():
+                        if initialBpId + j in self.damageMap[iCh].keys():
+                            if 2 in self.damageMap[iCh][initialBpId + j].keys():
+                                typeDamage = self.damageMap[iCh][initialBpId + j][2].type
+                                if typeDamage <= 0:
+                                    typeDamage = 0
+                                damageSpec.append(1)
+                                damageSpec.append(j+1)
+                                damageSpec.append(typeDamage)
+                for j in range(0, self.nbpForDSB):
+                    if iCh in self.damageMap.keys():
+                        if initialBpId + j in self.damageMap[iCh].keys():
+                            if 1 in self.damageMap[iCh][initialBpId + j].keys():
+                                typeDamage = self.damageMap[iCh][initialBpId + j][1].type
+                                if typeDamage <= 0:
+                                    typeDamage = 0
+                                damageSpec.append(2)
+                                damageSpec.append(j+1)
+                                damageSpec.append(typeDamage)
+                for j in range(0, self.nbpForDSB):
+                    if iCh in self.damageMap.keys():
+                        if initialBpId + j in self.damageMap[iCh].keys():
+                            if 4 in self.damageMap[iCh][initialBpId + j].keys():
+                                typeDamage = self.damageMap[iCh][initialBpId + j][4].type
+                                if typeDamage <= 0:
+                                    typeDamage = 0
+                                damageSpec.append(3)
+                                damageSpec.append(j+1)
+                                damageSpec.append(typeDamage)
+                for j in range(0, self.nbpForDSB):
+                    if iCh in self.damageMap.keys():
+                        if initialBpId + j in self.damageMap[iCh].keys():
+                            if 3 in self.damageMap[iCh][initialBpId + j].keys():
+                                typeDamage = self.damageMap[iCh][initialBpId + j][3].type
+                                if typeDamage <= 0:
+                                    typeDamage = 0
+                                damageSpec.append(4)
+                                damageSpec.append(j+1)
+                                damageSpec.append(typeDamage)
+                newsite.FullBreakSpec = damageSpec
+                self.damageSitesAtCurrentTime.append(newsite)
 
     def writeSDD(self, filename, version='2.0'):
         self.outputSDDHeader(filename)
@@ -871,12 +948,10 @@ class DamageToDNA:
 
     def getParticleTimes(self):
         times = []
-        for iCh in self.damageMap.keys():
-            for iBp in self.damageMap[iCh].keys():
-                for iCo in self.damageMap[iCh][iBp].keys():
-                    time = self.damageMap[iCh][iBp][iCo].particletime
-                    if time not in times:
-                        times.append(time)
+        for d in self.damageSitesAtCurrentTime:
+            time = d.ParticleTime
+            if time not in times:
+                times.append(time)
         return times
 
     def getDamageCenterAndBoundaries(self, pos):

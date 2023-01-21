@@ -123,6 +123,7 @@ class SDDDamageSite:
         self.particles = []
         self.LesionTime = 0
         self.ParticleTime = 0
+        self.isRepaired = False
 
     def PrintProperties(self):
         temp = vars(self)

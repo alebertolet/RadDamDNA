@@ -10,7 +10,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from RadDamDNA.bioStage.running import Simulator
 
 class SimulatorThread(QtCore.QThread):
-    def __init__(self, time_options, diffusion_model, dsb_model, ssb_model, bd_model, nucleus_max_radius, basepath, max_dose, version, n_runs):
+    def __init__(self, time_options, diffusion_model, dsb_model, ssb_model, bd_model, nucleus_max_radius, basepath, max_dose, version, n_runs,
+                 irradiation_time, dose_rate_function, dose_rate_parameter1, dose_rate_parameter2):
         super().__init__()
         self.time_options = time_options
         self.diffusion_model = diffusion_model
@@ -22,9 +23,14 @@ class SimulatorThread(QtCore.QThread):
         self.max_dose = max_dose
         self.version = version
         self.n_runs = n_runs
+        self.irradiation_time = irradiation_time
+        self.dose_rate_function = dose_rate_function
+        self.dose_rate_parameter1 = dose_rate_parameter1
+        self.dose_rate_parameter2 = dose_rate_parameter2
 
     def run(self):
-        sim = Simulator(self.time_options, self.diffusion_model, self.dsb_model, self.ssb_model, self.bd_model, self.nucleus_max_radius)
+        sim = Simulator(self.time_options, self.diffusion_model, self.dsb_model, self.ssb_model, self.bd_model, self.nucleus_max_radius,
+                        self.irradiation_time, self.dose_rate_function, doseratefunctionargs=[self.dose_rate_parameter1, self.dose_rate_parameter2])
         sim.ReadDamage(self.basepath, self.max_dose, self.version)
         sim.Run(self.n_runs, rereadDamageForNewRuns=False, basepath=self.basepath, maxDose=self.max_dose, version=self.version)
 
@@ -53,6 +59,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bd_model_label = QtWidgets.QLabel("BD repair Model:")
         self.bd_model_input = QtWidgets.QComboBox()
         self.bd_model_input.addItems(["standard", "none"])
+        self.irradiation_time_label = QtWidgets.QLabel("Irradiation Time (h):")
+        self.irradiation_time_input = QtWidgets.QLineEdit()
+        self.dose_rate_function_combo = QtWidgets.QComboBox()
+        self.dose_rate_function_combo.addItems(["uniform", "linear", "exponential"])
+        self.dose_rate_param1_input = QtWidgets.QLineEdit()
+        self.dose_rate_param2_input = QtWidgets.QLineEdit()
         self.n_runs_label = QtWidgets.QLabel("Number of Runs:")
         self.n_runs_input = QtWidgets.QLineEdit()
         self.basepath_label = QtWidgets.QLabel("Basepath:")
@@ -70,6 +82,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.final_time_input.setText("25")
         self.time_points_input.setText("100")
         self.nucleus_max_radius_input.setText("4.65")
+        self.irradiation_time_input.setText("0")
         self.n_runs_input.setText("10")
         self.basepath_input.setText("/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/ChemMicrodosimetry/nucleusSims/xray/sims/250keV.txt/")
         self.max_dose_input.setText("0.25")
@@ -86,6 +99,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.layout.addRow(self.dsb_model_label, self.dsb_model_input)
         self.layout.addRow(self.ssb_model_label, self.ssb_model_input)
         self.layout.addRow(self.bd_model_label, self.bd_model_input)
+        self.layout.addRow(self.irradiation_time_label, self.irradiation_time_input)
+        self.layout.addRow("Dose rate function:", self.dose_rate_function_combo)
+        self.layout.addRow("Initial dose rate (Gy/h):", self.dose_rate_param1_input)
+        self.layout.addRow("Half-life for exponential (h):", self.dose_rate_param2_input)
         self.layout.addRow(self.n_runs_label, self.n_runs_input)
         self.basepath_layout = QtWidgets.QHBoxLayout()
         self.basepath_layout.addWidget(self.basepath_input)
@@ -101,7 +118,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.central_widget)
 
         # Connect run button to run function
-        self.run_button.clicked.connect(self.run)
+        self.run_button.clicked.connect(self.run, QtCore.Qt.BlockingQueuedConnection)
 
     def browse_basepath(self):
         options = QtWidgets.QFileDialog.Options()
@@ -121,6 +138,16 @@ class MainWindow(QtWidgets.QMainWindow):
         dsb_model = self.dsb_model_input.currentText()
         ssb_model = self.ssb_model_input.currentText()
         bd_model = self.bd_model_input.currentText()
+        irradiation_time = int(self.irradiation_time_input.text()) * 3600
+        dose_rate_function = self.dose_rate_function_combo.currentText()
+        try:
+            dose_rate_param1 = float(self.dose_rate_param1_input.text()) / 3600
+        except:
+            dose_rate_param1 = None
+        try:
+            dose_rate_param2 = float(self.dose_rate_param2_input.text()) * 3600
+        except:
+            dose_rate_param2 = None
         n_runs = int(self.n_runs_input.text())
         basepath = self.basepath_input.text()
         max_dose = float(self.max_dose_input.text())
@@ -128,7 +155,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Create instance of Simulator and set parameters
         self.simulator_thread = SimulatorThread(time_options, diffusion_model, dsb_model, ssb_model, bd_model,
-                                                nucleus_max_radius, basepath, max_dose, version, n_runs)
+                                                nucleus_max_radius, basepath, max_dose, version, n_runs, irradiation_time,
+                                                dose_rate_function, dose_rate_param1, dose_rate_param2)
         self.simulator_thread.start()
 
 if __name__ == "__main__":
