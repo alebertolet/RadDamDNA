@@ -13,7 +13,7 @@ from scipy.optimize import minimize, Bounds
 from scipy.interpolate import interp1d
 
 # Time options is a list with initial, final times and number of steps (or a list of custom time points as 4th arg)
-timeOptions = [0, 5*3600, 20]
+timeOptions = [0, 25*3600, 10]
 nucleusMaxRadius = 4.65
 diffusionModel = 'free'
 diffusionparams = {'D': 2.0e-6, 'Dunits': 'um^2/s'}
@@ -24,7 +24,7 @@ ssbModel = 'standard'
 ssbparams = {'rNC': 5.833e-4, 'rNCunits': 'rep/s', 'rC': 7.222e-5, 'rCunits': 'rep/s'}
 bdModel = 'standard'
 bdparams = {'r': 5.833e-4, 'runits': 'rep/s'}
-nRuns = 1
+nRuns = 2
 
 # Configuration of the experiment
 maxDose = 1.0 # Gy
@@ -40,12 +40,18 @@ version = '1.0'
 
 # Read experimental data
 exptimes = np.array([])
-expdata = np.array([])
+expdsb = np.array([])
 with open('/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/Medras/medras_normal.csv', 'r') as csvfile:
     data_reader = csv.reader(csvfile)
     for row in data_reader:
         exptimes = np.append(exptimes, float(row[0]))
-        expdata = np.append(expdata, float(row[1]))
+        expdsb = np.append(expdsb, float(row[1]))
+
+sortindices = np.argsort(exptimes)
+exptimes = exptimes[sortindices]
+expdsb = expdsb[sortindices]
+
+listresiduals = []
 
 # Define the function to be optimized
 def optimization_function(params):
@@ -64,6 +70,8 @@ def optimization_function(params):
     sim_avgDSBremaining = sim_output.avgyvalues / sim_output.avgyvalues[0]
     sim_interp = interp1d(sim_times, sim_avgDSBremaining, kind='cubic', fill_value='extrapolate')
     simdata = sim_interp(exptimes)
+    simdata = simdata[exptimes <= timeOptions[1]/3600]
+    expdata = expdsb[exptimes <= timeOptions[1]/3600]
     residuals = (simdata - expdata)**2
     print('Residuals: ' + str(sum(residuals)))
     return sum(residuals)

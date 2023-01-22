@@ -129,6 +129,8 @@ class RunManager:
         self.runoutputDSB = output.AverageTimeCurveOverRuns()
         self.plotflag = True
         self.currentrun = 0
+
+    def InitializeNewRun(self):
         self.betracks = []
         self.ssbdamages = []
         self.bdamages = []
@@ -185,6 +187,7 @@ class RunManager:
     def Run(self):
         self.originaldamage = deepcopy(self.damage)
         for i in range(self.nRuns):
+            self.InitializeNewRun()
             self.repairedList = []
             self.misrepairedlist = []
             self.currentrun += 1
