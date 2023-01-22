@@ -69,14 +69,14 @@ def optimization_function(params):
     return sum(residuals)
 
 # Define the initial guesses for the parameters
-rNCN_0 = 1.833e-3
+rNCN_0 = 1.833e-4
 rComplex_0 = 9.222e-5
-D = 2.0e-18
+D = 2.0e-6
 initial_guess = [rNCN_0, rComplex_0, D]
 
 # Run the optimization
 lower_bounds = [0, 0, 0]
-upper_bounds = [np.inf, np. inf, 1e-5]
+upper_bounds = [np.inf, np. inf, 1e-4]
 result = minimize(optimization_function, initial_guess, bounds=Bounds(lower_bounds, upper_bounds))
 
 # Print the optimal values of the parameters
