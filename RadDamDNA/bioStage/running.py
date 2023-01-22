@@ -56,6 +56,7 @@ class Simulator:
                 else:
                     self.ReadDamage(basepath, maxDose, version)
                     self.runManager.Run()
+        self.avgRemainingDSBOverTime = self.runManager.outDSB
 
     def ReadDamage(self, basepath, maxDose=2.0, version='2.0'):
         damage = DamageToDNA(messages=self.messages)

@@ -37,3 +37,6 @@ sim = Simulator(timeOptions=timeOptions, diffusionmodel=diffusionModel, dsbmodel
                 diffusionparams=diffusionparams, dsbparams=dsbparams, ssbparams=ssbparams, bdparams=bdparams)
 sim.ReadDamage(basepath, maxDose, version)
 sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version)
+output = sim.avgRemainingDSBOverTime
+times = output.times
+avgDSBremaining = output.avgyvalues
