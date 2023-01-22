@@ -57,7 +57,7 @@ class Simulator:
                 else:
                     self.ReadDamage(basepath, maxDose, version)
                     self.runManager.Run()
-        self.avgRemainingDSBOverTime = self.runManager.outDSB
+        self.avgRemainingDSBOverTime = self.runManager.runoutputDSB
 
     def ReadDamage(self, basepath, maxDose=2.0, version='2.0'):
         damage = DamageToDNA(messages=self.messages)
@@ -129,11 +129,11 @@ class RunManager:
         self.runoutputDSB = output.AverageTimeCurveOverRuns()
         self.plotflag = True
         self.currentrun = 0
-
-    def InitializeNewTracks(self, dam):
         self.betracks = []
         self.ssbdamages = []
         self.bdamages = []
+
+    def InitializeNewTracks(self, dam):
         for iCh in dam.DSBMap:
             for iBp in dam.DSBMap[iCh]:
                 for iCo in dam.DSBMap[iCh][iBp]:

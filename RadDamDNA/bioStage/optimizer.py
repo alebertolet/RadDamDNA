@@ -13,7 +13,7 @@ from scipy.optimize import minimize, Bounds
 from scipy.interpolate import interp1d
 
 # Time options is a list with initial, final times and number of steps (or a list of custom time points as 4th arg)
-timeOptions = [0, 25*3600, 10]
+timeOptions = [0, 5*3600, 20]
 nucleusMaxRadius = 4.65
 diffusionModel = 'free'
 diffusionparams = {'D': 2.0e-6, 'Dunits': 'um^2/s'}
@@ -49,8 +49,9 @@ with open('/Users/ai925/Dropbox (Partners HealthCare)/Microdosimetry Project/Med
 
 # Define the function to be optimized
 def optimization_function(params):
-    rNCN, rComplex = params
-    print('Trying rNCN = ' + str(rNCN) + ' and rComplex = ' + str(rComplex))
+    rNCN, rComplex, D = params
+    print('Trying rNCN = ' + str(rNCN) + ', rComplex = ' + str(rComplex) + ' and D = ' + str(D))
+    diffusionparams = {'D': D, 'Dunits': 'um^2/s'}
     dsbparams = {'NEHJ': True, 'rNCNC': rNCN, 'rNCNCunits': 'rep/s', 'rComplex': rComplex, 'rComplexunits': 'rep/s',
                  'rMMEJ': 2.361e-6, 'rMMEJunits': 'rep/s', 'sigma': 0.25, 'sigmaUnits': 'um'}
     sim = Simulator(timeOptions=timeOptions, diffusionmodel=diffusionModel, dsbmodel=dsbModel, ssbmodel=ssbModel, bdmodel=bdModel,
@@ -60,10 +61,7 @@ def optimization_function(params):
     sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, plot=False)
     sim_output = sim.avgRemainingDSBOverTime
     sim_times = sim_output.times
-    if nRuns > 1:
-        sim_avgDSBremaining = sim_output.avgyvalues / sim_output.avgyvalues[0]
-    else:
-        sim_avgDSBremaining = sim_output.yvalues / sim_output.yvalues[0]
+    sim_avgDSBremaining = sim_output.avgyvalues / sim_output.avgyvalues[0]
     sim_interp = interp1d(sim_times, sim_avgDSBremaining, kind='cubic', fill_value='extrapolate')
     simdata = sim_interp(exptimes)
     residuals = (simdata - expdata)**2
@@ -71,13 +69,14 @@ def optimization_function(params):
     return sum(residuals)
 
 # Define the initial guesses for the parameters
-rNCN_0 = 5.833e-4
-rComplex_0 = 7.222e-5
-initial_guess = [rNCN_0, rComplex_0]
+rNCN_0 = 1.833e-3
+rComplex_0 = 9.222e-5
+D = 2.0e-18
+initial_guess = [rNCN_0, rComplex_0, D]
 
 # Run the optimization
-lower_bounds = [0, 0]
-upper_bounds = [np.inf, np. inf]
+lower_bounds = [0, 0, 0]
+upper_bounds = [np.inf, np. inf, 1e-5]
 result = minimize(optimization_function, initial_guess, bounds=Bounds(lower_bounds, upper_bounds))
 
 # Print the optimal values of the parameters
