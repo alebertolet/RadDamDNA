@@ -38,10 +38,11 @@ class Simulator:
                                      bdrepairmodel=bdmodel, nucleusMaxRadius=nucleusMaxRadius, messages=self.messages, diffusionParameters=diffusionparams,
                                      dsbrepairParameters=dsbparams, ssbrepairParameters=ssbparams, bdrepairParameters=bdparams)
 
-    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None):
+    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None, plot=True):
         self.nRuns = nRuns
         self.runManager.nRuns = nRuns
         self.runManager.maxDose = maxDose
+        self.runManager.plotflag = False
         if not rereadDamageForNewRuns:
             self.runManager.Run()
         else:
@@ -193,8 +194,7 @@ class RunManager:
                 self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
                 self.DSBEvolution()
             while self.clock.CurrentTime != self.clock.FinalTime:
-                print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h - Dose: " + str(self.damage.cumulativeDose) + " Gy")
-                print("Number of DSB: " + str(self.damage.numDSB))
+                print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h - Dose: " + str(round(self.damage.cumulativeDose, 2)) + " Gy. Number of DSB: " + str(self.damage.numDSB))
                 self.InitializeNewTracks(self.damage)
                 self.clock.AdvanceTimeStep()
                 self.DoOneStep()
