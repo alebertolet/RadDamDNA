@@ -29,13 +29,14 @@ BD = 3
 
 class Simulator:
     def __init__(self, timeOptions=[], diffusionmodel='free', dsbmodel='standard', ssbmodel='standard', bdmodel='standard', nucleusMaxRadius = None,
-                 irradiationTime=0, doseratefunction=None, doseratefunctionargs=None):
+                 irradiationTime=0, doseratefunction=None, doseratefunctionargs=None, diffusionparams=None, dsbparams=None, ssbparams=None, bdparams=None):
         self.messages = []
         self.irradiationTime = irradiationTime
         self.doseratefunction = doseratefunction
         self.doseratefunctionargs = doseratefunctionargs
         self.runManager = RunManager(timeOptions=timeOptions, diffusionmodel=diffusionmodel, dsbrepairmodel=dsbmodel, ssbrepairmodel=ssbmodel,
-                                     bdrepairmodel=bdmodel, nucleusMaxRadius=nucleusMaxRadius, messages=self.messages)
+                                     bdrepairmodel=bdmodel, nucleusMaxRadius=nucleusMaxRadius, messages=self.messages, diffusionParameters=diffusionparams,
+                                     dsbrepairParameters=dsbparams, ssbrepairParameters=ssbparams, bdrepairParameters=bdparams)
 
     def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None):
         self.nRuns = nRuns
@@ -72,7 +73,7 @@ class Simulator:
         accumulatedose = 0
         for i, e in enumerate(neworder):
             accumulatedose = damage.accumulateDose
-            time = self.getTimeForDose(accumulatedose)
+            time = self._getTimeForDose(accumulatedose)
             if 0 < self.irradiationTime < time:
                 time = 1e20
             path = basepath + str(e) + '/'
@@ -80,7 +81,7 @@ class Simulator:
         damage.populateDamages(getVideo=False, stopAtDose=maxDose, stopAtTime=0)
         self.runManager.damage = damage
 
-    def getTimeForDose(self, d):
+    def _getTimeForDose(self, d):
         if self.irradiationTime == 0:
             return 0
         if self.doseratefunction is None:
@@ -96,7 +97,8 @@ class Simulator:
 
 class RunManager:
     def __init__(self, timeOptions = [], diffusionmodel='free', dsbrepairmodel='standard', ssbrepairmodel='standard',
-                 bdrepairmodel='standard', nucleusMaxRadius = None, outputs=[DSB, MISREPDSB, SSB, BD], messages=[]):
+                 bdrepairmodel='standard', nucleusMaxRadius = None, outputs=[DSB, MISREPDSB, SSB, BD], messages=[],
+                 diffusionParameters=None, dsbrepairParameters=None, ssbrepairParameters=None, bdrepairParameters=None):
         self.messages = messages
         self.maxDose = -1
         self._diffusionactivated = False
@@ -104,18 +106,18 @@ class RunManager:
         self._ssbrepactivated = False
         self._bdrepactivated = False
         self.trackid = 0
-        if diffusionmodel == 'free':
+        if diffusionmodel is not None or diffusionmodel.lower() != 'none':
             self.DiffusionActivated = True
-            self.diffusionModel = processes.Diffusion()
-        if dsbrepairmodel == 'standard':
+            self.diffusionModel = processes.Diffusion(diffusionmodel, diffusionParameters)
+        if dsbrepairmodel is not None or dsbrepairmodel.lower() != 'none':
             self.DSBRepairActivated = True
-            self.dsbRepairModel = processes.DSBRepair()
-        if ssbrepairmodel == 'standard':
+            self.dsbRepairModel = processes.DSBRepair(dsbrepairmodel, dsbrepairParameters)
+        if ssbrepairmodel is not None or ssbrepairmodel.lower() != 'none':
             self.SSBRepairActivated = True
-            self.ssbRepairModel = processes.SSBRepair()
-        if bdrepairmodel == 'standard':
+            self.ssbRepairModel = processes.SSBRepair(ssbrepairmodel, ssbrepairParameters)
+        if bdrepairmodel is not None or bdrepairmodel.lower() != 'none':
             self.BDRepairActivated = True
-            self.bdRepairModel = processes.BDRepair()
+            self.bdRepairModel = processes.BDRepair(bdrepairmodel, bdrepairParameters)
         if len(timeOptions) > 3:
             self.clock = Clock(timeOptions[0], timeOptions[1], timeOptions[2], timeOptions[3])
         else:
@@ -257,7 +259,7 @@ class RunManager:
     def DoBDRepair(self):
         for i in range(len(self.bdamages)):
             if self.bdamages[i].Status == DAMAGED:
-                if self.bdRepairModel.Repair(self.bdamages[i], self.clock.CurrentTimeStep):
+                if self.bdRepairModel.Repair(self.clock.CurrentTimeStep):
                     self.bdamages[i].Status = REPAIRED
 
     def UpdateDamageMaps(self):

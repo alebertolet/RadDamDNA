@@ -6,6 +6,7 @@ Created on 11/6/22 3:00 PM
 @author: alejandrobertolet
 """
 import numpy as np
+from models import DiffusionModel, DSBRepairModel, SSBRepairModel, BDRepairModel
 
 DAMAGED = 1
 REPAIRED = 2
@@ -28,48 +29,38 @@ class TrackPairProcess:
         return np.sqrt(np.power(pos1[0] - pos2[0], 2) + np.power(pos1[1] - pos2[1], 2) + np.power(pos1[2] - pos2[2], 2))
 
 class Diffusion:
-    def __init__(self, model='free'):
+    def __init__(self, model='free', pars=None):
         if model == 'free':
-            self.ActivateFreeDiffusion()
+            self.ActivateFreeDiffusion(pars)
 
-    def ActivateFreeDiffusion(self):
-        self.model = 0
-        self.Dcoeff = 2.0e-6 # um^2/s
+    def ActivateFreeDiffusion(self, pars):
+        self.model = DiffusionModel('free', pars)
 
     def Diffuse(self, pos, timestep):
-        if self.model == 0:
+        if self.model.Model == 'free':
             pos = np.array(pos)
             Ns = np.random.normal(0, 1, 3)
-            return pos + Ns * np.sqrt(self.Dcoeff * timestep)
+            return pos + Ns * np.sqrt(self.model.diffusionCoefficient * timestep)
         else:
             return pos
 
 class DSBRepair(TrackPairProcess):
-    def __init__(self, model='standard'):
+    def __init__(self, model='standard', pars=None):
         if model == 'standard':
-            self.ActivateDSBRepairStandard()
+            self.ActivateDSBRepairStandard(pars)
 
-    def ActivateDSBRepairStandard(self):
-        self.model = 0
+    def ActivateDSBRepairStandard(self, pars=None):
+        self.model = DSBRepairModel('standard', pars)
         self.InteractionRadius = 1e8
 
     def Repair(self, tracklist, timestep):
-        if self.model == 0:
-            self.CompetentInNEHJ = True
-            self.distanceRegularization = 0.1  # um
-            # Rates for different complexity combinations
-            # Fast repair for not complex breaks
-            self.repairRateNCNC = 5.833e-4 # rep/s
-            # Slow repair for complex breaks
-            self.repairRateComplex = 7.222e-5 # rep/s
-            # Repair for when NHEJ is non active
-            self.repairMMEJ = 2.361e-6 # rep/s # MEDRAS parameter adapted by distance
+        if self.model.Model == 'standard':
             ntracks = len(tracklist)
             probmatrix = np.zeros([ntracks, ntracks])
             for i in range(ntracks):
                 for j in range(i+1, ntracks):
                     if tracklist[i].GetLastStep().Status == DAMAGED and tracklist[j].GetLastStep().Status == DAMAGED:
-                        probmatrix[i, j] = self.GetPairwiseProbability(tracklist[i], tracklist[j], timestep)
+                        probmatrix[i, j] = self.GetStandardPairwiseProbability(tracklist[i], tracklist[j], timestep)
                     else:
                         probmatrix[i, j] = 0.0
             rs = np.random.random([ntracks, ntracks])
@@ -91,22 +82,19 @@ class DSBRepair(TrackPairProcess):
                             repaired[i, j] = False
             return repaired
 
-    def GetPairwiseProbability(self, betrack1, betrack2, timestep):
-        if self.model == 0:
-            distance = self._getDistance(betrack1, betrack2)
-            if distance > self.InteractionRadius:
-                return 0.0
-            else:
-                if distance < self.distanceRegularization:
-                    distance = self.distanceRegularization
-                fd = np.power(self.distanceRegularization/distance, 2)
-                if self.CompetentInNEHJ:
-                    if betrack1.GetLastStep().Complexity <= 10.01 and betrack2.GetLastStep().Complexity <= 10.01:
-                        return (1.0 - np.exp(-self.repairRateNCNC * timestep)) * fd
-                    else:
-                        return (1.0 - np.exp(-self.repairRateComplex * timestep)) * fd
+    def GetStandardPairwiseProbability(self, betrack1, betrack2, timestep):
+        distance = self._getDistance(betrack1, betrack2)
+        if distance > self.InteractionRadius:
+            return 0.0
+        else:
+            fd = np.exp(-distance**2 / (2*self.model.sigmaDistance**2))
+            if self.model.competentInNEHJ:
+                if betrack1.GetLastStep().Complexity <= 10.01 and betrack2.GetLastStep().Complexity <= 10.01:
+                    return (1.0 - np.exp(-self.model.repairRateNCNC * timestep)) * fd
                 else:
-                    return (1.0 - np.exp(-self.repairMMEJ * timestep)) * fd
+                    return (1.0 - np.exp(-self.model.repairRateComplex * timestep)) * fd
+            else:
+                return (1.0 - np.exp(-self.model.repairMMEJ * timestep)) * fd
 
     @property
     def CompetentInNEHJ(self):
@@ -116,37 +104,32 @@ class DSBRepair(TrackPairProcess):
         self._nhej = v
 
 class SSBRepair:
-    def __init__(self, model='standard'):
+    def __init__(self, model='standard', pars=None):
         if model == 'standard':
-            self.ActivateSSBRepairStandard()
+            self.ActivateSSBRepairStandard(pars)
 
-    def ActivateSSBRepairStandard(self):
-        self.model = 0
+    def ActivateSSBRepairStandard(self, pars):
+        self.model = SSBRepairModel('standard', pars)
 
     def Repair(self, damtrack, timestep):
-        if self.model == 0:
-            # Two repair rates
-            self.repairRateNoComplex = 1.774e-3 # rep/s # Fitted to data from Schiplers and Iliakis 2013
-            self.repairRateComplex = 2.247e-16 # Complex SSB are way more difficult to repair
+        if self.model.Model == 'standard':
             if damtrack.Complexity >= 10.0:
-                prob = 1 - np.exp(-self.repairRateComplex * timestep)
+                prob = 1 - np.exp(-self.model.repairRateComplex * timestep)
             else:
-                prob = 1 - np.exp(-self.repairRateNoComplex * timestep)
+                prob = 1 - np.exp(-self.model.repairRateNoComplex * timestep)
             r = np.random.random()
             return r <= prob
 
 class BDRepair:
-    def __init__(self, model='standard'):
+    def __init__(self, model='standard', pars=None):
         if model == 'standard':
-            self.ActivateBDRepairStandard()
+            self.ActivateBDRepairStandard(pars)
 
-    def ActivateBDRepairStandard(self):
-        self.model = 0
+    def ActivateBDRepairStandard(self, pars):
+        self.model = BDRepairModel('standard', pars)
 
-    def Repair(self, damtrack, timestep):
-        if self.model == 0:
-            # Single exponential repair
-            self.repairRate = 4.297e-4  # Fitted data from Rahmanian, Taleei and Nikjoo 2014
-            prob = 1 - np.exp(-self.repairRate * timestep)
+    def Repair(self, timestep):
+        if self.model.Model == 'standard':
+            prob = 1 - np.exp(-self.model.repairRate * timestep)
             r = np.random.random()
             return r <= prob
