@@ -54,10 +54,9 @@ expdsb = expdsb[sortindices]
 listresiduals = []
 
 # Define the function to be optimized
-def optimization_function(exptimes, rNCN, rComplex, D):
-    #rNCN, rComplex, D = params
-    print('Trying rNCN = ' + str(rNCN) + ', rComplex = ' + str(rComplex) + ' and D = ' + str(D))
-    diffusionparams = {'D': D, 'Dunits': 'um^2/s'}
+def optimization_function(params):
+    rNCN, rComplex = params
+    print('Trying rNCN = ' + str(rNCN) + ', rComplex = ' + str(rComplex) )
     dsbparams = {'NEHJ': True, 'rNCNC': rNCN, 'rNCNCunits': 'rep/s', 'rComplex': rComplex, 'rComplexunits': 'rep/s',
                  'rMMEJ': 2.361e-6, 'rMMEJunits': 'rep/s', 'sigma': 0.25, 'sigmaUnits': 'um'}
     sim = Simulator(timeOptions=timeOptions, diffusionmodel=diffusionModel, dsbmodel=dsbModel, ssbmodel=ssbModel, bdmodel=bdModel,
@@ -71,24 +70,23 @@ def optimization_function(exptimes, rNCN, rComplex, D):
     sim_interp = interp1d(sim_times, sim_avgDSBremaining, kind='cubic', fill_value='extrapolate')
     simdata = sim_interp(exptimes)
     simdata = simdata[exptimes <= timeOptions[1]/3600]
-    return simdata
-    #expdata = expdsb[exptimes <= timeOptions[1]/3600]
-    #residuals = (simdata - expdata)**2
-    #print('Residuals: ' + str(sum(residuals)))
-    #return sum(residuals)
+    #return simdata
+    expdata = expdsb[exptimes <= timeOptions[1]/3600]
+    residuals = (simdata - expdata)**2
+    print('Residuals: ' + str(sum(residuals)))
+    return sum(residuals)
 
 # Define the initial guesses for the parameters
 rNCN_0 = 9.833e-4
 rComplex_0 = 4.222e-4
-D = 2.0e-6
-initial_guess = [rNCN_0, rComplex_0, D]
+initial_guess = [rNCN_0, rComplex_0]
 
 # Run the optimization
-lower_bounds = [0, 0, 0]
-upper_bounds = [np.inf, np. inf, 1e-4]
-#result = minimize(optimization_function, initial_guess, bounds=Bounds(lower_bounds, upper_bounds))
-popt, pcov = curve_fit(optimization_function, exptimes, expdsb, p0=initial_guess, bounds=(lower_bounds, upper_bounds))
+lower_bounds = [0, 0]
+upper_bounds = [np.inf, np. inf]
+result = minimize(optimization_function, initial_guess, bounds=Bounds(lower_bounds, upper_bounds), method='L-BFGS-B')
+#popt, pcov = curve_fit(optimization_function, exptimes, expdsb, p0=initial_guess)#, bounds=(lower_bounds, upper_bounds))
 
 # Print the optimal values of the parameters
-print(popt)
-#print("Optimal values of rNCN and rComplex: ", result.x)
+#print(popt)
+print("Optimal values of rNCN and rComplex: ", result.x)
