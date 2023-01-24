@@ -7,13 +7,14 @@ Created on 1/22/23 3:32 PM
 """
 import csv
 import numpy as np
+import matplotlib.pyplot as plt
 
 from RadDamDNA.bioStage.running import Simulator
 from scipy.optimize import minimize, Bounds, curve_fit, least_squares
 from scipy.interpolate import interp1d
 
 # Time options is a list with initial, final times and number of steps (or a list of custom time points as 4th arg)
-timeOptions = [0, 25*3600, 15]
+timeOptions = [0, 5*3600, 11]
 nucleusMaxRadius = 4.65
 diffusionModel = 'free'
 diffusionparams = {'D': 2.0e-6, 'Dunits': 'um^2/s'}
@@ -24,7 +25,7 @@ ssbModel = 'standard'
 ssbparams = {'rNC': 5.833e-4, 'rNCunits': 'rep/s', 'rC': 7.222e-5, 'rCunits': 'rep/s'}
 bdModel = 'standard'
 bdparams = {'r': 5.833e-4, 'runits': 'rep/s'}
-nRuns = 3
+nRuns = 10
 
 # Configuration of the experiment
 maxDose = 1.0 # Gy
@@ -52,18 +53,20 @@ exptimes = exptimes[sortindices]
 expdsb = expdsb[sortindices]
 
 listresiduals = []
+rComplex_0 = 4.222e-4
 
 # Define the function to be optimized
 def optimization_function(params):
-    rNCN, rComplex = params
-    print('Trying rNCN = ' + str(rNCN) + ', rComplex = ' + str(rComplex) )
-    dsbparams = {'NEHJ': True, 'rNCNC': rNCN, 'rNCNCunits': 'rep/s', 'rComplex': rComplex, 'rComplexunits': 'rep/s',
+    #rNCN, rComplex = params
+    rNCN = params
+    print('Trying rNCN = ' + str(rNCN))# + ', rComplex = ' + str(rComplex) )
+    dsbparams = {'NEHJ': True, 'rNCNC': rNCN, 'rNCNCunits': 'rep/s', 'rComplex': rComplex_0, 'rComplexunits': 'rep/s',
                  'rMMEJ': 2.361e-6, 'rMMEJunits': 'rep/s', 'sigma': 0.25, 'sigmaUnits': 'um'}
     sim = Simulator(timeOptions=timeOptions, diffusionmodel=diffusionModel, dsbmodel=dsbModel, ssbmodel=ssbModel, bdmodel=bdModel,
                     nucleusMaxRadius=nucleusMaxRadius, irradiationTime=irradiationTime, doseratefunction=doseratefunction, doseratefunctionargs=[doserate, halflife],
                     diffusionparams=diffusionparams, dsbparams=dsbparams, ssbparams=ssbparams, bdparams=bdparams)
     sim.ReadDamage(basepath, maxDose, version)
-    sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, plot=False)
+    sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, plot=False, verbose=1)
     sim_output = sim.avgRemainingDSBOverTime
     sim_times = sim_output.times
     sim_avgDSBremaining = sim_output.avgyvalues / sim_output.avgyvalues[0]
@@ -77,16 +80,26 @@ def optimization_function(params):
     return sum(residuals)
 
 # Define the initial guesses for the parameters
-rNCN_0 = 9.833e-4
-rComplex_0 = 4.222e-4
-initial_guess = [rNCN_0, rComplex_0]
+rNCN_0 = 1e-3
+rComplex_0 = 4e-4
+initial_guess = [rNCN_0]#, rComplex_0]
 
 # Run the optimization
-lower_bounds = [0, 0]
-upper_bounds = [np.inf, np. inf]
-result = minimize(optimization_function, initial_guess, bounds=Bounds(lower_bounds, upper_bounds), method='L-BFGS-B')
+lower_bounds = [0]#, 0]
+upper_bounds = [np.inf]#, np. inf]
+result = minimize(optimization_function, initial_guess, bounds=Bounds(lower_bounds, upper_bounds))
 #popt, pcov = curve_fit(optimization_function, exptimes, expdsb, p0=initial_guess)#, bounds=(lower_bounds, upper_bounds))
 
 # Print the optimal values of the parameters
 #print(popt)
 print("Optimal values of rNCN and rComplex: ", result.x)
+dsbparams = {'NEHJ': True, 'rNCNC': result.x[0], 'rNCNCunits': 'rep/s', 'rComplex': rComplex_0, 'rComplexunits': 'rep/s',
+             'rMMEJ': 2.361e-6, 'rMMEJunits': 'rep/s', 'sigma': 0.25, 'sigmaUnits': 'um'}
+sim = Simulator(timeOptions=timeOptions, diffusionmodel=diffusionModel, dsbmodel=dsbModel, ssbmodel=ssbModel,
+                bdmodel=bdModel,
+                nucleusMaxRadius=nucleusMaxRadius, irradiationTime=irradiationTime, doseratefunction=doseratefunction,
+                doseratefunctionargs=[doserate, halflife],
+                diffusionparams=diffusionparams, dsbparams=dsbparams, ssbparams=ssbparams, bdparams=bdparams)
+sim.ReadDamage(basepath, maxDose, version)
+sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, verbose=1)
+#plt.scatter(exptimes, expdsb, label='Experimental data')

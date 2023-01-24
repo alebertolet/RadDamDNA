@@ -38,11 +38,13 @@ class Simulator:
                                      bdrepairmodel=bdmodel, nucleusMaxRadius=nucleusMaxRadius, messages=self.messages, diffusionParameters=diffusionparams,
                                      dsbrepairParameters=dsbparams, ssbrepairParameters=ssbparams, bdrepairParameters=bdparams)
 
-    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None, plot=True):
+    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None, plot=True, verbose=0):
         self.nRuns = nRuns
         self.runManager.nRuns = nRuns
         self.runManager.maxDose = maxDose
         self.runManager.plotflag = False
+        if plot:
+            self.runManager.plotflag = True
         if not rereadDamageForNewRuns:
             self.runManager.Run()
         else:
@@ -50,13 +52,13 @@ class Simulator:
             self.runManager.plotflag = False
             for i in range(self.nRuns):
                 self.runManager.nRuns = 1
-                if i == self.nRuns - 1:
+                if i == self.nRuns - 1 and plot:
                     self.runManager.plotflag = True
                 if i == 0:
                     self.runManager.Run()
                 else:
                     self.ReadDamage(basepath, maxDose, version)
-                    self.runManager.Run()
+                    self.runManager.Run(verbose=verbose)
         self.avgRemainingDSBOverTime = self.runManager.runoutputDSB
 
     def ReadDamage(self, basepath, maxDose=2.0, version='2.0'):
@@ -184,7 +186,7 @@ class RunManager:
                             self.bdamages.append(newBDDamage)
                             self.trackid += 1
 
-    def Run(self):
+    def Run(self, verbose=0):
         self.originaldamage = deepcopy(self.damage)
         for i in range(self.nRuns):
             self.InitializeNewRun()
@@ -197,7 +199,8 @@ class RunManager:
                 self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
                 self.DSBEvolution()
             while self.clock.CurrentTime != self.clock.FinalTime:
-                print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h - Dose: " + str(round(self.damage.cumulativeDose, 2)) + " Gy. Number of DSB: " + str(self.damage.numDSB))
+                if verbose > 0:
+                    print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h - Dose: " + str(round(self.damage.cumulativeDose, 2)) + " Gy. Number of DSB: " + str(self.damage.numDSB))
                 self.InitializeNewTracks(self.damage)
                 self.clock.AdvanceTimeStep()
                 self.DoOneStep()
