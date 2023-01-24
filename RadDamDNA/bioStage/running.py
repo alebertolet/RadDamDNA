@@ -193,13 +193,14 @@ class RunManager:
             self.repairedList = []
             self.misrepairedlist = []
             self.currentrun += 1
-            self.messages.append('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
+            if verbose > 0:
+                self.messages.append('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
             print(self.messages[-1])
             if DSB in self.outputs:
                 self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
                 self.DSBEvolution()
             while self.clock.CurrentTime != self.clock.FinalTime:
-                if verbose > 0:
+                if verbose > 1:
                     print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h - Dose: " + str(round(self.damage.cumulativeDose, 2)) + " Gy. Number of DSB: " + str(self.damage.numDSB))
                 self.InitializeNewTracks(self.damage)
                 self.clock.AdvanceTimeStep()
@@ -209,7 +210,8 @@ class RunManager:
                 #self.outDSB.Plot()
                 #self.outDSB.WriteCSV()
             self.messages.append('Repaired: ' + str(len(self.repairedList)) + ' - Misrepaired: ' + str(len(self.misrepairedlist)))
-            print(self.messages[-1])
+            if verbose > 0:
+                print(self.messages[-1])
             self.clock.Reset()
             self.resetDamage()
         if DSB in self.outputs:

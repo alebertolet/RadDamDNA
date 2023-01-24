@@ -66,7 +66,7 @@ def optimization_function(params):
                     nucleusMaxRadius=nucleusMaxRadius, irradiationTime=irradiationTime, doseratefunction=doseratefunction, doseratefunctionargs=[doserate, halflife],
                     diffusionparams=diffusionparams, dsbparams=dsbparams, ssbparams=ssbparams, bdparams=bdparams)
     sim.ReadDamage(basepath, maxDose, version)
-    sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, plot=False, verbose=1)
+    sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, plot=False, verbose=0)
     sim_output = sim.avgRemainingDSBOverTime
     sim_times = sim_output.times
     sim_avgDSBremaining = sim_output.avgyvalues / sim_output.avgyvalues[0]
@@ -101,5 +101,5 @@ sim = Simulator(timeOptions=timeOptions, diffusionmodel=diffusionModel, dsbmodel
                 doseratefunctionargs=[doserate, halflife],
                 diffusionparams=diffusionparams, dsbparams=dsbparams, ssbparams=ssbparams, bdparams=bdparams)
 sim.ReadDamage(basepath, maxDose, version)
-sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, verbose=1)
+sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, verbose=2)
 #plt.scatter(exptimes, expdsb, label='Experimental data')
