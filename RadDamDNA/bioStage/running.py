@@ -193,9 +193,9 @@ class RunManager:
             self.repairedList = []
             self.misrepairedlist = []
             self.currentrun += 1
+            self.messages.append('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
             if verbose > 0:
-                self.messages.append('Repair run ' + str(self.currentrun) + ' of ' + str(self.TotalRuns) + '...')
-            print(self.messages[-1])
+                print(self.messages[-1])
             if DSB in self.outputs:
                 self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
                 self.DSBEvolution()
