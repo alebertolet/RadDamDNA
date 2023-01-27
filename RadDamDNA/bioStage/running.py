@@ -46,7 +46,7 @@ class Simulator:
         if plot:
             self.runManager.plotflag = True
         if not rereadDamageForNewRuns:
-            self.runManager.Run()
+            self.runManager.Run(verbose=verbose)
         else:
             self.runManager.TotalRuns = self.nRuns
             self.runManager.plotflag = False
@@ -55,7 +55,7 @@ class Simulator:
                 if i == self.nRuns - 1 and plot:
                     self.runManager.plotflag = True
                 if i == 0:
-                    self.runManager.Run()
+                    self.runManager.Run(verbose=verbose)
                 else:
                     self.ReadDamage(basepath, maxDose, version)
                     self.runManager.Run(verbose=verbose)

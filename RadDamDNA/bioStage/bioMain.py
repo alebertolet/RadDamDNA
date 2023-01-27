@@ -11,15 +11,15 @@ from RadDamDNA.bioStage.running import Simulator
 timeOptions = [0, 25*3600, 24]
 nucleusMaxRadius = 4.65
 diffusionModel = 'free'
-diffusionparams = {'D': 2.0e-6, 'Dunits': 'um^2/s'}
+diffusionparams = {'D': 2.0e-7, 'Dunits': 'um^2/s'}
 dsbModel = 'standard'
-dsbparams = {'NEHJ': True, 'rNCNC': 5.833e-4, 'rNCNCunits': 'rep/s', 'rComplex': 7.222e-5, 'rComplexunits': 'rep/s',
+dsbparams = {'NEHJ': True, 'rNCNC': 2e-4, 'rNCNCunits': 'rep/s', 'rComplex': 7.222e-5, 'rComplexunits': 'rep/s',
              'rMMEJ': 2.361e-6, 'rMMEJunits': 'rep/s', 'sigma': 0.25, 'sigmaUnits': 'um'}
 ssbModel = 'standard'
-ssbparams = {'rNC': 5.833e-4, 'rNCunits': 'rep/s', 'rC': 7.222e-5, 'rCunits': 'rep/s'}
+ssbparams = {'rNC': 6e-3, 'rNCunits': 'rep/s', 'rC': 7e-4, 'rCunits': 'rep/s'}
 bdModel = 'standard'
-bdparams = {'r': 5.833e-4, 'runits': 'rep/s'}
-nRuns = 2
+bdparams = {'r': 9e-3, 'runits': 'rep/s'}
+nRuns = 20
 irradiationTime = 25*3600
 #doseratefunction = 'exponential'
 doseratefunction = None
@@ -36,7 +36,7 @@ sim = Simulator(timeOptions=timeOptions, diffusionmodel=diffusionModel, dsbmodel
                 nucleusMaxRadius=nucleusMaxRadius, irradiationTime=irradiationTime, doseratefunction=doseratefunction, doseratefunctionargs=[doserate, halflife],
                 diffusionparams=diffusionparams, dsbparams=dsbparams, ssbparams=ssbparams, bdparams=bdparams)
 sim.ReadDamage(basepath, maxDose, version)
-sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version)
+sim.Run(nRuns, rereadDamageForNewRuns=False, basepath=basepath, maxDose=maxDose, version=version, verbose=2)
 output = sim.avgRemainingDSBOverTime
 times = output.times
 avgDSBremaining = output.avgyvalues
