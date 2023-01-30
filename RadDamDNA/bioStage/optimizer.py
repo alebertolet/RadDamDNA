@@ -81,7 +81,7 @@ def optimization_function(params):
 
 # Define the initial guesses for the parameters
 rNCN_0 = 2e-4
-D = 8e-7
+D = 2e-8
 initial_guess = [rNCN_0, D]
 
 # Run the optimization

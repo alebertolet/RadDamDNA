@@ -15,7 +15,7 @@ class DiffusionModel:
         # pars is a dictionary with the parameters
         if self.Model == 'free':
             if pars is None:
-                self.diffusionCoefficient = 2.0e-6
+                self.diffusionCoefficient = 8.0e-7
                 self.diffusionCoefficientUnits = 'um^2/s'
             else:
                 self.diffusionCoefficient = pars['D']
@@ -35,7 +35,7 @@ class DSBRepairModel:
         if self.Model == 'standard':
             if pars is None:
                 self.competentInNEHJ = True
-                self.repairRateNCNC = 5.833e-4
+                self.repairRateNCNC = 2.0e-4
                 self.repairRateNCNCUnits = 'rep/s'
                 self.repairRateComplex = 7.222e-5
                 self.repairRateComplexUnits = 'rep/s'

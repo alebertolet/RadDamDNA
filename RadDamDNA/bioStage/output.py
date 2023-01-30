@@ -55,6 +55,7 @@ class AverageTimeCurveOverRuns:
             ax.scatter(self.refdata.x, self.refdata.y, label='Experimental points')
             ax.legend()
         ax.grid()
+        return fig, ax
 
     def WriteCSV(self, resultsFolder='./'):
         df = pd.DataFrame({"Time" : self.times, "Avg-" + self.runlist[0].ylabel : self.avgyvalues, "Var-" + self.runlist[0].ylabel : self.varyvalues})
@@ -108,6 +109,7 @@ class TimeCurveForSingleRun:
             ax.scatter(self.refdata.x, self.refdata.y, label='Experimental points')
             ax.legend()
         ax.grid()
+        return fig, ax
 
     def WriteCSV(self, resultsFolder='./', scaledToInitialValue=True):
         if scaledToInitialValue:

@@ -21,6 +21,13 @@ class DamageToDNA:
         self.stopAtDose = -1.0
         self.accumulateDose = 0
         self.cumulativeDose = 0
+        self.numtracks = 0
+        self.damagespertrack = {}
+        self.damagespertrack['DSB'] = []
+        self.damagespertrack['SB'] = []
+        self.damagespertrack['BD'] = []
+        self.damagespertrack['Dose'] = []
+        self.damagespertrack['NumSites'] = []
 
     def initializeStructures(self):
         self.damageSites = []
@@ -50,6 +57,7 @@ class DamageToDNA:
                 split = l.split()
                 self.doses = np.append(self.doses, float(split[1]))
                 self.accumulateDose += self.doses[-1]
+                self.damagespertrack['Dose'].append(self.doses[-1])
         sddpath = path + namessd
         self.readFromSDD(sddpath, version, particleTime, lesionTime)
         f.close()
@@ -69,6 +77,16 @@ class DamageToDNA:
             dsite.ParticleTime = particleTime
             dsite.LesionTime = lesionTime
             self.damageSites.append(dsite)
+            if int(dsite.newExposure) > 0:
+                self.numtracks += 1
+                self.damagespertrack['DSB'].append(0)
+                self.damagespertrack['SB'].append(0)
+                self.damagespertrack['BD'].append(0)
+                self.damagespertrack['NumSites'].append(0)
+            self.damagespertrack['DSB'][self.numtracks-1] += dsite.numberofDSBs
+            self.damagespertrack['SB'][self.numtracks-1] += dsite.numberofstrandbreaks
+            self.damagespertrack['BD'][self.numtracks-1] += dsite.numberofbasedamages
+            self.damagespertrack['NumSites'][self.numtracks-1] += 1
 
     def recomputeDamagesFromReadSites(self, stopAtDose = -1, stopAtTime = -1):
         self.recomputeSitesAtCurrentTime()
@@ -997,22 +1015,22 @@ class DamageToDNA:
     def printDamageCount(self):
         self.messages.append("Summary of damage"); print(self.messages[-1])
         self.messages.append("-----------------"); print(self.messages[-1])
-        self.messages.append("Dose", self.accumulateDose, "Gy"); print(self.messages[-1])
-        self.messages.append("DSB", self.numDSB); print(self.messages[-1])
-        self.messages.append("DSB_Direct", self.numDSBDirect); print(self.messages[-1])
-        self.messages.append("DSB_Indirect", self.numDSBIndirect); print(self.messages[-1])
-        self.messages.append("DSB_Hybrid", self.numDSBHybrid); print(self.messages[-1])
-        self.messages.append("SSB", self.numSSB); print(self.messages[-1])
-        self.messages.append("SSB_Direct", self.numSSBDirect); print(self.messages[-1])
-        self.messages.append("SSB_Indirect", self.numSSBIndirect); print(self.messages[-1])
-        self.messages.append("SB", self.numSB); print(self.messages[-1])
-        self.messages.append("SB_Direct", self.numSBDirect); print(self.messages[-1])
-        self.messages.append("SB_Indirect", self.numSBIndirect); print(self.messages[-1])
-        self.messages.append("BD", self.numBD); print(self.messages[-1])
-        self.messages.append("BD_Direct", self.numBDDirect); print(self.messages[-1])
-        self.messages.append("BD_Indirect", self.numBDIndirect); print(self.messages[-1])
-        self.messages.append("DSB positions", len(self.DSBPositions)); print(self.messages[-1])
-        self.messages.append("Number of foci", self.getNumberOfFoci(0.5)); print(self.messages[-1])
+        self.messages.append("Dose " + str(self.cumulativeDose) + " Gy"); print(self.messages[-1])
+        self.messages.append("DSB " + str(self.numDSB)); print(self.messages[-1])
+        self.messages.append("DSB_Direct " + str(self.numDSBDirect)); print(self.messages[-1])
+        self.messages.append("DSB_Indirect " + str(self.numDSBIndirect)); print(self.messages[-1])
+        self.messages.append("DSB_Hybrid " + str(self.numDSBHybrid)); print(self.messages[-1])
+        self.messages.append("SSB " + str(self.numSSB)); print(self.messages[-1])
+        self.messages.append("SSB_Direct " + str(self.numSSBDirect)); print(self.messages[-1])
+        self.messages.append("SSB_Indirect " + str(self.numSSBIndirect)); print(self.messages[-1])
+        self.messages.append("SB " + str(self.numSB)); print(self.messages[-1])
+        self.messages.append("SB_Direct " + str(self.numSBDirect)); print(self.messages[-1])
+        self.messages.append("SB_Indirect " + str(self.numSBIndirect)); print(self.messages[-1])
+        self.messages.append("BD " + str(self.numBD)); print(self.messages[-1])
+        self.messages.append("BD_Direct " + str(self.numBDDirect)); print(self.messages[-1])
+        self.messages.append("BD_Indirect " + str(self.numBDIndirect)); print(self.messages[-1])
+        self.messages.append("DSB positions " + str(len(self.DSBPositions))); print(self.messages[-1])
+        self.messages.append("Number of foci " + str(self.getNumberOfFoci(0.5))); print(self.messages[-1])
 
     def getDoseResponseCurve(self, plot=True, q='dsb'):
         if q.lower() == 'dsb':
