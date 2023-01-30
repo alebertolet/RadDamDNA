@@ -39,6 +39,7 @@ class DamageToDNA:
         self.SSBarray = []; self.SSBdirectarray = []; self.SSBindirectarray = []
         self.SBarray = []; self.SBdirectarray = []; self.SBindirectarray = []
         self.BDarray = []; self.BDdirectarray = []; self.BDindirectarray = []
+        self.numSitesarray = []
         self.DSBPositions = []
 
     def initializeCounters(self):
@@ -47,6 +48,7 @@ class DamageToDNA:
         self.numDSB = 0; self.numDSBDirect = 0; self.numDSBIndirect = 0; self.numDSBHybrid = 0
         self.numBD = 0; self.numBDDirect = 0; self.numBDIndirect = 0
         self.numSSBPlus = 0; self.numDSBPlus = 0; self.numDSBComplex = 0
+        self.provnsites = 0
 
     def readSDDAndDose(self, path, namessd = 'DNADamage_sdd.txt', namephsp = 'DNADamage.phsp', version='2.0', particleTime=0, lesionTime=0):
         if namephsp is not None:
@@ -144,6 +146,7 @@ class DamageToDNA:
                     self.SSBarray.append(self.numSSB); self.SSBdirectarray.append(self.numSSBDirect); self.SSBindirectarray.append(self.numSSBIndirect)
                     self.SBarray.append(self.numSB); self.SBdirectarray.append(self.numSBDirect); self.SBindirectarray.append(self.numSBIndirect)
                     self.BDarray.append(self.numBD); self.BDdirectarray.append(self.numBDDirect); self.BDindirectarray.append(self.numBDIndirect)
+                    self.numSitesarray.append(self.provnsites)
                     if getVideo:
                         self.produce3DImage(show=False)
             if damage.newExposure == 1:
@@ -435,6 +438,7 @@ class DamageToDNA:
                 initialBpIds = (bp for bp in basePairs)
                 maxDamage, index = max((d, i) for d, i in zip(linearAccumulatedDamage, initialBpIds))
                 startingBpIdForDamageSites.append(index)
+                self.provnsites += 1
                 for i in range(self.nbpForDSB):
                     self.assignComplexities(iCh, index + i, maxDamage)
                 basePairs = [bp for bp in basePairs if bp < index or bp > index + self.nbpForDSB]
@@ -1072,6 +1076,8 @@ class DamageToDNA:
         elif q.lower() == 'bdi':
             y = self.BDindirectarray
             ylabel = 'Indirect BD'
+        elif q.lower() == 'nsites':
+            y = self.numSitesarray
         if plot:
             fig = plt.figure()
             fig.set_size_inches((4, 4))
