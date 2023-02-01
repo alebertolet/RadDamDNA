@@ -90,9 +90,9 @@ class DamageToDNA:
             self.damagespertrack['BD'][self.numtracks-1] += dsite.numberofbasedamages
             self.damagespertrack['NumSites'][self.numtracks-1] += 1
 
-    def recomputeDamagesFromReadSites(self, stopAtDose = -1, stopAtTime = -1):
+    def recomputeDamagesFromReadSites(self, stopAtDose = -1, stopAtTime = -1, recalculatePerEachTrack=False):
         self.recomputeSitesAtCurrentTime()
-        self.populateDamages(stopAtDose, stopAtTime)
+        self.populateDamages(stopAtDose, stopAtTime, recalculatePerEachTrack)
         self.computeStrandBreaks()
 
     def populateDamages(self, stopAtDose = -1, stopAtTime = -1, recalculatePerEachTrack=False, recalculateEveryQuarterOfGray=False,
@@ -847,125 +847,6 @@ class DamageToDNA:
                         damageSpec = damageSpec[:-2]
                         f.write(damageSpec + ";")
                         f.write('\n')
-        return numSites
-
-    def computeMedrasBreaks(self, recalculateDamage=True):
-        self.medrasBreaks = []
-        if recalculateDamage:
-            self.populateDamages()
-            self.computeStrandBreaks()
-        self.emptySets = 0
-        self.complexities = []
-        damageSitesPerEvent = self.classifyDamageSites()
-        numSites = 0
-        firstExposure = True
-        for damageSites in damageSitesPerEvent:
-            complexity = 0
-            setDSB = 0
-            newEvent = True
-            self.medrasBreaks.append([])
-            for iCh in damageSites.keys():
-                ibpsTakenForThisChromosome = []
-                for i in range(len(damageSites[iCh])):
-                    initialBpId = damageSites[iCh][i]
-                    dir = 0; indir = 0
-                    bd = 0; sb = 0; dsb = 0
-                    for j in range(self.nbpForDSB):
-                        if initialBpId + j not in ibpsTakenForThisChromosome:
-                            if iCh in self.SSBMap.keys():
-                                if initialBpId + j in self.SSBMap[iCh].keys():
-                                    if 1 in self.SSBMap[iCh][initialBpId + j].keys():
-                                        if self.SSBMap[iCh][initialBpId + j][1] == 1 or self.SSBMap[iCh][initialBpId + j][1].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                        if self.SSBMap[iCh][initialBpId + j][1] == 2:
-                                            indir += 1
-                                            sb += 1
-                                    if 2 in self.SSBMap[iCh][initialBpId + j].keys():
-                                        if self.SSBMap[iCh][initialBpId + j][2] == 1 or self.SSBMap[iCh][initialBpId + j][2].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                        if self.SSBMap[iCh][initialBpId + j][2] == 2:
-                                            indir += 1
-                                            sb += 1
-                            if iCh in self.DSBMap.keys():
-                                if initialBpId + j in self.DSBMap[iCh].keys():
-                                    if 1 in self.DSBMap[iCh][initialBpId + j].keys():
-                                        if self.DSBMap[iCh][initialBpId + j][1].type == 1 or self.DSBMap[iCh][initialBpId + j][1].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                            dsb += 1
-                                            setDSB += 1
-                                            pos1 = self.damageMap[iCh][initialBpId + j][2].position
-                                            lesionTime = self.damageMap[iCh][initialBpId + j][2].lesiontime
-                                        if self.DSBMap[iCh][initialBpId + j][1].type == 2:
-                                            indir += 1
-                                            sb += 1
-                                            dsb += 1
-                                            setDSB += 1
-                                            pos1 = self.damageMap[iCh][initialBpId + j][2].position
-                                            lesionTime = self.damageMap[iCh][initialBpId + j][2].lesiontime
-                                    if 2 in self.DSBMap[iCh][initialBpId + j].keys():
-                                        if self.DSBMap[iCh][initialBpId + j][2].type == 1 or self.DSBMap[iCh][initialBpId + j][2].type == 3:
-                                            dir += 1
-                                            sb += 1
-                                            pos2 = self.damageMap[iCh][initialBpId + j][3].position
-                                        if self.DSBMap[iCh][initialBpId + j][2].type == 2:
-                                            indir += 1
-                                            sb += 1
-                                            pos2 = self.damageMap[iCh][initialBpId + j][3].position
-                            if iCh in self.BDMap.keys():
-                                if initialBpId + j in self.BDMap[iCh].keys():
-                                    if 1 in self.BDMap[iCh][initialBpId + j].keys():
-                                        if self.BDMap[iCh][initialBpId + j][1].type == 1 or self.BDMap[iCh][initialBpId + j][1].type == 3:
-                                            dir += 1
-                                            bd += 1
-                                        if self.BDMap[iCh][initialBpId + j][1].type == 2:
-                                            indir += 1
-                                            bd += 1
-                                    if 2 in self.BDMap[iCh][initialBpId + j].keys():
-                                        if self.BDMap[iCh][initialBpId + j][2].type == 1 or self.BDMap[iCh][initialBpId + j][2].type == 3:
-                                            dir += 1
-                                            bd += 1
-                                        if self.BDMap[iCh][initialBpId + j][2].type == 2:
-                                            indir += 1
-                                            bd += 1
-                        ibpsTakenForThisChromosome.append(initialBpId + j)
-                    if dsb == 0:
-                        break
-                    if dsb + sb - 2 * dsb + bd > 2:
-                        complexBreak = True
-                        complexity += 1
-                    else:
-                        complexBreak = False
-                    newExposureFlag = 0
-                    if newEvent:
-                        newExposureFlag = 1
-                        newEvent = False
-                    if firstExposure:
-                        newExposureFlag = 2
-                        firstExposure = False
-                    chromosomeLength = self.Chromosomesizes[iCh]
-                    damageChromPos = initialBpId / chromosomeLength / 1e6
-                    chromID = [1, iCh, 1, 0]
-                    typedamage = 0
-                    if dir == 0 and indir > 0:
-                        typedamage = 1
-                    if dir > 0 and indir > 0:
-                        typedamage = 2
-                    cause = [typedamage, dir, indir]
-                    # Break is: index, position, complexity, chromosome ID, upstream/downstream, new event status, time and cause
-                    medrasbreak1 = [numSites, pos1, complexBreak, chromID[:], damageChromPos, -1, newExposureFlag, lesionTime, cause]
-                    medrasbreak2 = [numSites, pos2, complexBreak, chromID[:], damageChromPos, 1, 0, lesionTime, cause]
-                    self.medrasBreaks[-1] += [medrasbreak1, medrasbreak2]
-                    numSites += 1
-            self.complexities.append(complexity)
-            if setDSB < 1:
-                self.medrasBreaks.pop()
-                self.complexities.pop()
-                self.emptySets += 1
-        complexFrac = [1.0 * c / (len(b) / 2.0) for c,b in zip(self.complexities, self.medrasBreaks)]
-        self.meanComplexity = np.mean(complexFrac)
         return numSites
 
     def getParticleTimes(self):

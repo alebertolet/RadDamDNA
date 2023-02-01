@@ -14,10 +14,6 @@ import pickle
 picklefile = '/Users/ai925/source/workspace/repair/yieldDataProtonsAndxray.pickle'
 readfromdisk = False
 
-fig = plt.figure()
-fig.set_size_inches((12, 12))
-ax = fig.add_subplot(111)
-
 if not readfromdisk:
     nboot = 15
 
@@ -28,15 +24,15 @@ if not readfromdisk:
     #energies = ['250keV', '100MeV', '20MeV', '10MeV', '5MeV', '2MeV', '1MeV', '0.8MeV', '8MeV', '6MeV', '4MeV', '2MeV', '1MeV']
     #c = ['black', 'gray', 'slategray', 'skyblue', 'blue', 'green', 'olive', 'orange', 'peru', 'brown', 'salmon', 'red', 'darkred']
 
-    particles = ['xray', 'proton', 'proton', 'proton', 'proton', 'proton', 'proton', 'proton']
-    energies = ['250keV', '100MeV', '20MeV', '10MeV', '5MeV', '2MeV', '1MeV', '0.8MeV']
+    particles = ['xray', 'proton', 'proton', 'proton', 'proton', 'proton', 'proton']
+    energies = ['250keV', '100MeV', '20MeV', '10MeV', '5MeV', '2MeV', '1MeV']
     #particles = ['alpha', 'alpha', 'alpha', 'alpha', 'alpha']
     #energies = ['8MeV', '6MeV', '4MeV', '2MeV', '1MeV']
 
     c = ['black', 'gray', 'red', 'green', 'blue', 'orange', 'brown', 'darkred']
-    particles.reverse()
-    energies.reverse()
-    c.reverse()
+    #particles.reverse()
+    #energies.reverse()
+    #c.reverse()
 
     data = {}
     # Loop over all particles and energies specified above
@@ -58,9 +54,11 @@ if not readfromdisk:
         # Preparing arrays
         Dose = np.linspace(0, maxdose, 100)
         DSB = np.zeros(Dose.shape)
+        nsites = np.zeros(Dose.shape)
         alldsbs = np.zeros([len(Dose), nboot])
         allssbs = np.zeros([len(Dose), nboot])
         allbds = np.zeros([len(Dose), nboot])
+        allnsites = np.zeros([len(Dose), nboot])
         SSB = np.zeros(Dose.shape)
         BD = np.zeros(Dose.shape)
         ntries = np.zeros(Dose.shape)
@@ -73,23 +71,27 @@ if not readfromdisk:
                 path = basepath + str(j) + '/'
                 damage.readSDDAndDose(path, version='1.0')
 
-            damage.populateDamages(stopAtDose=maxdose, recalculateEveryQuarterOfGray=False, recalculatePerEachTrack=True, classifySites=False)
-            damage.computeStrandBreaks(classifySites=False)
+            damage.populateDamages(stopAtDose=maxdose, recalculateEveryQuarterOfGray=False, recalculatePerEachTrack=True, classifySites=True)
+            #damage.computeStrandBreaks(classifySites=False)
             #damage.printDamageCount()
             dose, dsb = damage.getDoseResponseCurve(plot=False, q='dsb')
             dose, ssb = damage.getDoseResponseCurve(plot=False, q='ssb')
             dose, bd = damage.getDoseResponseCurve(plot=False, q='bd')
+            dose, nsites = damage.getDoseResponseCurve(plot=False, q='nsites')
             dose = np.array(dose)
             dsb = np.array(dsb)
             ssb = np.array(dsb)
             bd = np.array(dsb)
+            nsites = np.array(nsites)
             dose = np.insert(dose, 0, 0)
             dsb = np.insert(dsb, 0, 0)
             ssb = np.insert(ssb, 0, 0)
             bd = np.insert(bd, 0, 0)
+            nsites = np.insert(nsites, 0, 0)
             fdsb = interpolate.interp1d(dose, dsb)
             fssb = interpolate.interp1d(dose, ssb)
             fbd = interpolate.interp1d(dose, bd)
+            fnsites = interpolate.interp1d(dose, nsites)
             for id, d in enumerate(Dose):
                 if d >= 0 and d < np.max(dose):
                     DSB[id] += fdsb(d)
@@ -98,23 +100,29 @@ if not readfromdisk:
                     allssbs[id, i] = fssb(d)
                     BD[id] += fbd(d)
                     allbds[id, i] = fbd(d)
+                    nsites[id] += fnsites(d)
+                    allnsites[id, i] = fnsites(d)
                     ntries[id] += 1
 
         vardsb = np.zeros(Dose.shape)
         varssb = np.zeros(Dose.shape)
         varbd = np.zeros(Dose.shape)
+        varnsites = np.zeros(Dose.shape)
         for j in range(alldsbs.shape[0]):
             vardsb[j] = np.var(alldsbs[j, :])
             varssb[j] = np.var(allssbs[j, :])
             varbd[j] = np.var(allbds[j, :])
+            varnsites[j] = np.var(allnsites[j, :])
 
         stddsb = np.sqrt(vardsb)
         stdssb = np.sqrt(varssb)
         stdbd = np.sqrt(varbd)
+        stdnsites = np.sqrt(varnsites)
 
         DSB = DSB / ntries
         SSB = SSB / ntries
         BD = BD / ntries
+        nsites = nsites / ntries
 
         data[identifier]['Dose'] = Dose
         data[identifier]['DSB'] = DSB
@@ -123,12 +131,20 @@ if not readfromdisk:
         data[identifier]['stdDSB'] = stddsb
         data[identifier]['stdSSB'] = stdssb
         data[identifier]['stdBD'] = stdbd
+        data[identifier]['nsites'] = nsites
 
-        ax.plot(Dose, DSB, '-', label=particles[ip]+'-'+e, color=c[ip])
-        ax.fill_between(Dose, DSB-stddsb, DSB+stddsb, color=c[ip], alpha=0.15)
-        ax.set_xlabel('Dose (Gy)')
-        ax.set_ylabel('DSB')
-        fig.tight_layout()
+        fig, ax = plt.subplots(2, 1, figsize=(6, 4))
+        ax[0].plot(Dose, DSB, color=c[ip], label=identifier)
+        ax[0].fill_between(Dose, DSB - stddsb, DSB + stddsb, color=c[ip], alpha=0.2)
+        ax[0].set_xlabel('Dose (Gy)')
+        ax[0].set_ylabel('Cumulative DSB')
+
+        ax[1].plot(Dose, nsites, color=c[ip], label=identifier)
+        ax[1].fill_between(Dose, nsites - stdnsites, nsites + stdnsites, color=c[ip], alpha=0.2)
+        ax[1].set_xlabel('Dose (Gy)')
+        ax[1].set_ylabel('Cumulative number of damage sites')
+        plt.tight_layout()
+        plt.savefig('DSB_' + identifier + '.png', dpi=300)
 
     with open(picklefile, 'wb') as handle:
         pickle.dump(data, handle)
