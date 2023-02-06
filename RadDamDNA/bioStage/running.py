@@ -60,6 +60,7 @@ class Simulator:
                     self.ReadDamage(basepath, maxDose, version)
                     self.runManager.Run(verbose=verbose, outputnorm=outputnorm)
         self.avgRemainingDSBOverTime = self.runManager.runoutputDSB
+        self.avgMisrepairedDSBOverTime = self.runManager.runoutputMisrepairedDSB
 
     def ReadDamage(self, basepath, maxDose=2.0, version='2.0', recalculatePerEachTrack=False):
         damage = DamageToDNA(messages=self.messages)
@@ -219,7 +220,7 @@ class RunManager:
             self.resetDamage()
         if DSB in self.outputs:
             self.runoutputDSB.DoStatistics(outputnorm)
-            self.runoutputMisrepairedDSB.DoStatistics(outputnorm)
+            self.runoutputMisrepairedDSB.DoStatistics(False)
             if self.plotflag:
                 self.runoutputDSB.Plot()
                 self.runoutputDSB.WriteCSV()
@@ -303,6 +304,7 @@ class RunManager:
 
     def DSBEvolution(self):
         self.outDSB.AddTimePoint(self.clock.CurrentTime, self.damage.numDSB)
+        self.misrepDSB.AddTimePoint(self.clock.CurrentTime, len(self.misrepairedlist))
 
     def _checkPosWithinNucleus(self, pos):
         if self.nucleusMaxRadius is None:
