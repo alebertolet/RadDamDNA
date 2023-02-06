@@ -129,6 +129,7 @@ class RunManager:
         self.nucleusMaxRadius = nucleusMaxRadius
         self.outputs = outputs
         self.runoutputDSB = output.AverageTimeCurveOverRuns()
+        self.runoutputMisrepairedDSB = output.AverageTimeCurveOverRuns()
         self.plotflag = True
         self.currentrun = 0
 
@@ -198,6 +199,7 @@ class RunManager:
                 print(self.messages[-1])
             if DSB in self.outputs:
                 self.outDSB = output.TimeCurveForSingleRun('Remaining DSB')
+                self.misrepDSB = output.TimeCurveForSingleRun('Misrepaired DSB')
                 self.DSBEvolution()
             while self.clock.CurrentTime != self.clock.FinalTime:
                 if verbose > 1:
@@ -207,6 +209,7 @@ class RunManager:
                 self.DoOneStep()
             if DSB in self.outputs:
                 self.runoutputDSB.AddTimeCurveForSingleRun(self.outDSB)
+                self.runoutputMisrepairedDSB.AddTimeCurveForSingleRun(self.misrepDSB)
                 #self.outDSB.Plot()
                 #self.outDSB.WriteCSV()
             self.messages.append('Repaired: ' + str(len(self.repairedList)) + ' - Misrepaired: ' + str(len(self.misrepairedlist)))
@@ -216,9 +219,13 @@ class RunManager:
             self.resetDamage()
         if DSB in self.outputs:
             self.runoutputDSB.DoStatistics(outputnorm)
+            self.runoutputMisrepairedDSB.DoStatistics(outputnorm)
             if self.plotflag:
                 self.runoutputDSB.Plot()
                 self.runoutputDSB.WriteCSV()
+                self.runoutputMisrepairedDSB.Plot()
+                self.runoutputMisrepairedDSB.WriteCSV()
+
 
     def resetDamage(self):
         self.damage = deepcopy(self.originaldamage)

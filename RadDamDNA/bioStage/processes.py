@@ -89,7 +89,7 @@ class DSBRepair(TrackPairProcess):
         else:
             fd = np.exp(-distance**2 / (2*self.model.sigmaDistance**2))
             if self.model.competentInNEHJ:
-                if betrack1.GetLastStep().Complexity <= 10.3 and betrack2.GetLastStep().Complexity <= 10.3:
+                if betrack1.GetLastStep().Complexity < 10.03 and betrack2.GetLastStep().Complexity < 10.03:
                     return (1.0 - np.exp(-self.model.repairRateNCNC * timestep)) * fd
                 else:
                     return (1.0 - np.exp(-self.model.repairRateComplex * timestep)) * fd
