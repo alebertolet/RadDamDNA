@@ -130,8 +130,9 @@ class DamageToDNA:
                 self.damageMap[iCh][damage.initialBp+bpdamage['basepairID']][bpdamage['subcomponent']] = \
                     SubcomponentLesion(bpdamage['type'], position, damage.LesionTime, damage.ParticleTime, iEvent)
             if (id < len(self.damageSitesAtCurrentTime) - 1 and self.damageSitesAtCurrentTime[id + 1].newExposure > 1) or id == len(self.damageSitesAtCurrentTime) - 1:
-                iExposure += 1
-                iEvent += 1
+                if id < len(self.damageSitesAtCurrentTime) - 1 and self.damageSitesAtCurrentTime[id + 1].newExposure > 1:
+                    iExposure += 1
+                    iEvent += 1
                 if recalculatePerEachTrack or id == len(self.damageSitesAtCurrentTime) - 1:
                     self.computeStrandBreaks(classifySites=classifySites)
                     dosefromlastrecalculation = 0
@@ -141,7 +142,7 @@ class DamageToDNA:
                     if recalculateEveryQuarterOfGray and dosefromlastrecalculation >= 0.25:
                         self.computeStrandBreaks(classifySites=classifySites)
                         dosefromlastrecalculation = 0
-                    self.Darray.append(self.accumulateDose)
+                    self.Darray.append(self.cumulativeDose)
                     self.DSBarray.append(self.numDSB); self.DSBdirectarray.append(self.numDSBDirect); self.DSBindirectarray.append(self.numDSBIndirect); self.DSBhybridarray.append(self.numDSBHybrid)
                     self.SSBarray.append(self.numSSB); self.SSBdirectarray.append(self.numSSBDirect); self.SSBindirectarray.append(self.numSSBIndirect)
                     self.SBarray.append(self.numSB); self.SBdirectarray.append(self.numSBDirect); self.SBindirectarray.append(self.numSBIndirect)

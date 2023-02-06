@@ -6,7 +6,7 @@ Created on 11/6/22 3:00 PM
 @author: alejandrobertolet
 """
 import numpy as np
-from models import DiffusionModel, DSBRepairModel, SSBRepairModel, BDRepairModel
+from RadDamDNA.bioStage.models import DiffusionModel, DSBRepairModel, SSBRepairModel, BDRepairModel
 
 DAMAGED = 1
 REPAIRED = 2

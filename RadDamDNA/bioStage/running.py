@@ -38,7 +38,7 @@ class Simulator:
                                      bdrepairmodel=bdmodel, nucleusMaxRadius=nucleusMaxRadius, messages=self.messages, diffusionParameters=diffusionparams,
                                      dsbrepairParameters=dsbparams, ssbrepairParameters=ssbparams, bdrepairParameters=bdparams)
 
-    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None, plot=True, verbose=0):
+    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None, plot=True, outputnorm=True, verbose=0):
         self.nRuns = nRuns
         self.runManager.nRuns = nRuns
         self.runManager.maxDose = maxDose
@@ -46,7 +46,7 @@ class Simulator:
         if plot:
             self.runManager.plotflag = True
         if not rereadDamageForNewRuns:
-            self.runManager.Run(verbose=verbose)
+            self.runManager.Run(verbose=verbose, outputnorm=outputnorm)
         else:
             self.runManager.TotalRuns = self.nRuns
             self.runManager.plotflag = False
@@ -55,13 +55,13 @@ class Simulator:
                 if i == self.nRuns - 1 and plot:
                     self.runManager.plotflag = True
                 if i == 0:
-                    self.runManager.Run(verbose=verbose)
+                    self.runManager.Run(verbose=verbose, outputnorm=outputnorm)
                 else:
                     self.ReadDamage(basepath, maxDose, version)
-                    self.runManager.Run(verbose=verbose)
+                    self.runManager.Run(verbose=verbose, outputnorm=outputnorm)
         self.avgRemainingDSBOverTime = self.runManager.runoutputDSB
 
-    def ReadDamage(self, basepath, maxDose=2.0, version='2.0'):
+    def ReadDamage(self, basepath, maxDose=2.0, version='2.0', recalculatePerEachTrack=False):
         damage = DamageToDNA(messages=self.messages)
         nfiles = len(os.listdir(basepath))
         # Section to get what directories actually contains both dose and SDD. Disregard others!
@@ -82,7 +82,7 @@ class Simulator:
                 time = 1e20
             path = basepath + str(e) + '/'
             damage.readSDDAndDose(path, version=version, particleTime=time, lesionTime=time)
-        damage.populateDamages(getVideo=False, stopAtDose=maxDose, stopAtTime=0)
+        damage.populateDamages(getVideo=False, stopAtDose=maxDose, stopAtTime=0, recalculatePerEachTrack=recalculatePerEachTrack)
         self.runManager.damage = damage
 
     def _getTimeForDose(self, d):
@@ -186,7 +186,7 @@ class RunManager:
                             self.bdamages.append(newBDDamage)
                             self.trackid += 1
 
-    def Run(self, verbose=0):
+    def Run(self, verbose=0, outputnorm=True):
         self.originaldamage = deepcopy(self.damage)
         for i in range(self.nRuns):
             self.InitializeNewRun()
@@ -215,7 +215,7 @@ class RunManager:
             self.clock.Reset()
             self.resetDamage()
         if DSB in self.outputs:
-            self.runoutputDSB.DoStatistics()
+            self.runoutputDSB.DoStatistics(outputnorm)
             if self.plotflag:
                 self.runoutputDSB.Plot()
                 self.runoutputDSB.WriteCSV()

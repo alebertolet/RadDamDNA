@@ -19,7 +19,7 @@ class AverageTimeCurveOverRuns:
     def AddTimeCurveForSingleRun(self, tc):
         self.runlist.append(tc)
 
-    def DoStatistics(self, scaledToInitialValue=True):
+    def DoStatistics(self, scaledToMaximumValue=True):
         self.times = self.runlist[0].times
         self.avgyvalues = np.zeros(len(self.times))
         self.varyvalues = np.zeros(len(self.times))
@@ -27,8 +27,8 @@ class AverageTimeCurveOverRuns:
             yvaluesfortimej = np.array([])
             for tc in self.runlist:
                 if tc.yvalues[0] != 0:
-                    if scaledToInitialValue:
-                        yvaluesfortimej = np.append(yvaluesfortimej, tc.yvalues[j]/tc.yvalues[0])
+                    if scaledToMaximumValue:
+                        yvaluesfortimej = np.append(yvaluesfortimej, tc.yvalues[j]/np.max(tc.yvalues))
                     else:
                         yvaluesfortimej = np.append(yvaluesfortimej, tc.yvalues[j])
             self.avgyvalues[j] = np.mean(yvaluesfortimej)

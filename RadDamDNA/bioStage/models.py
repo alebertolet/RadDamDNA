@@ -15,7 +15,7 @@ class DiffusionModel:
         # pars is a dictionary with the parameters
         if self.Model == 'free':
             if pars is None:
-                self.diffusionCoefficient = 8.0e-7
+                self.diffusionCoefficient = 5.0e-7
                 self.diffusionCoefficientUnits = 'um^2/s'
             else:
                 self.diffusionCoefficient = pars['D']
