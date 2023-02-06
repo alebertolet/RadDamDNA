@@ -37,9 +37,9 @@ class DSBRepairModel:
                 self.competentInNEHJ = True
                 self.repairRateNCNC = 2.0e-4
                 self.repairRateNCNCUnits = 'rep/s'
-                self.repairRateComplex = 7.222e-5
+                self.repairRateComplex = 1.0e-7
                 self.repairRateComplexUnits = 'rep/s'
-                self.repairMMEJ = 2.361e-6
+                self.repairMMEJ = 2.361e-7
                 self.repairMMEJUnits = 'rep/s'
                 self.sigmaDistance = 0.25
                 self.sigmaDistanceUnits = 'um'
