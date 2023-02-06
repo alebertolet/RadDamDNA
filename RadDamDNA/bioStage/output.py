@@ -26,11 +26,10 @@ class AverageTimeCurveOverRuns:
         for j in range(len(self.times)):
             yvaluesfortimej = np.array([])
             for tc in self.runlist:
-                if tc.yvalues[0] != 0:
-                    if scaledToMaximumValue:
-                        yvaluesfortimej = np.append(yvaluesfortimej, tc.yvalues[j]/np.max(tc.yvalues))
-                    else:
-                        yvaluesfortimej = np.append(yvaluesfortimej, tc.yvalues[j])
+                if scaledToMaximumValue:
+                    yvaluesfortimej = np.append(yvaluesfortimej, tc.yvalues[j]/np.max(tc.yvalues))
+                else:
+                    yvaluesfortimej = np.append(yvaluesfortimej, tc.yvalues[j])
             self.avgyvalues[j] = np.mean(yvaluesfortimej)
             self.varyvalues[j] = np.var(yvaluesfortimej)
 
