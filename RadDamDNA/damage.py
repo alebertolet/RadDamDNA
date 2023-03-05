@@ -1127,7 +1127,7 @@ class DamageToDNA:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         if indQuantity == 'Dose':
-            ax.set_title('Dose = ' + str(np.round(self.accumulateDose, 2)) + ' Gy')
+            ax.set_title('Dose = ' + str(np.round(self.cumulativeDose, 2)) + ' Gy')
         elif indValueString == '':
             ax.set_title()
         else:

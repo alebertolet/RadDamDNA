@@ -64,26 +64,39 @@ class Simulator:
 
     def ReadDamage(self, basepath, maxDose=2.0, version='2.0', recalculatePerEachTrack=False):
         damage = DamageToDNA(messages=self.messages)
-        nfiles = len(os.listdir(basepath))
-        # Section to get what directories actually contains both dose and SDD. Disregard others!
-        listOfAvailableDirs = []
-        for j in range(nfiles):
-            newpath = basepath + str(j) + '/'
-            if str(j) in os.listdir(basepath):
-                files = os.listdir(newpath)
-                if 'DNADamage_sdd.txt' in files and 'DNADamage.phsp' in files:
-                    if os.path.getsize(newpath + 'DNADamage_sdd.txt') > 0:  # only those with actual data
-                        listOfAvailableDirs.append(j)
-        neworder = random.sample(listOfAvailableDirs, len(listOfAvailableDirs))
-        accumulatedose = 0
-        for i, e in enumerate(neworder):
-            accumulatedose = damage.accumulateDose
-            time = self._getTimeForDose(accumulatedose)
-            if 0 < self.irradiationTime < time:
-                time = 1e20
-            path = basepath + str(e) + '/'
-            damage.readSDDAndDose(path, version=version, particleTime=time, lesionTime=time)
-        damage.populateDamages(getVideo=False, stopAtDose=maxDose, stopAtTime=0, recalculatePerEachTrack=recalculatePerEachTrack)
+        npaths = 1
+        if type(basepath) == list:
+            npaths = len(basepath)
+            if type(maxDose) is not list or len(maxDose) != npaths:
+                print('Doses have to match the number of radiations. The same dose will be used for all')
+                if type(maxDose) is not list:
+                    maxDose = [maxDose] * npaths
+                else:
+                    maxDose = [maxDose[0]] * npaths
+        totalaccumulateddose = 0
+        for ib, basepath in enumerate(basepath):
+            nfiles = len(os.listdir(basepath))
+            # Section to get what directories actually contains both dose and SDD. Disregard others!
+            listOfAvailableDirs = []
+            for j in range(nfiles):
+                newpath = basepath + str(j) + '/'
+                if str(j) in os.listdir(basepath):
+                    files = os.listdir(newpath)
+                    if 'DNADamage_sdd.txt' in files and 'DNADamage.phsp' in files:
+                        if os.path.getsize(newpath + 'DNADamage_sdd.txt') > 0:  # only those with actual data
+                            listOfAvailableDirs.append(j)
+            neworder = random.sample(listOfAvailableDirs, len(listOfAvailableDirs))
+            for i, e in enumerate(neworder):
+                accumulatedose = damage.accumulateDose - totalaccumulateddose
+                if accumulatedose > maxDose[ib]:
+                    break
+                time = self._getTimeForDose(accumulatedose)
+                if 0 < self.irradiationTime < time:
+                    time = 1e20
+                path = basepath + str(e) + '/'
+                damage.readSDDAndDose(path, version=version, particleTime=time, lesionTime=time)
+            totalaccumulateddose += accumulatedose
+        damage.populateDamages(getVideo=False, stopAtDose=-1, stopAtTime=0, recalculatePerEachTrack=recalculatePerEachTrack)
         self.runManager.damage = damage
 
     def _getTimeForDose(self, d):
@@ -220,7 +233,7 @@ class RunManager:
             self.resetDamage()
         if DSB in self.outputs:
             self.runoutputDSB.DoStatistics(outputnorm)
-            self.runoutputMisrepairedDSB.DoStatistics(False)
+            self.runoutputMisrepairedDSB.DoStatistics(outputnorm)
             if self.plotflag:
                 self.runoutputDSB.Plot()
                 self.runoutputDSB.WriteCSV()
