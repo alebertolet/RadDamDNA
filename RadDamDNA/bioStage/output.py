@@ -86,6 +86,13 @@ class TimeCurveForSingleRun:
         self.times = np.append(self.times, t)
         self.yvalues = np.append(self.yvalues, y)
 
+    def GetValueForTimePoint(self, t):
+        if self.timeunit == 'h':
+            t = t / 3600
+        elif self.timeunit == 'min':
+            t = t / 60
+        return np.interp(t, self.times, self.yvalues)
+
     def Plot(self, fsize=(10,6), scaledToInitialValue=True):
         if self.timeunit == 'h':
             xlabel = 'Time (h)'

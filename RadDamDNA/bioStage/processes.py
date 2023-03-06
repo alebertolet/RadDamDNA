@@ -6,6 +6,7 @@ Created on 11/6/22 3:00 PM
 @author: alejandrobertolet
 """
 import numpy as np
+import scipy.stats as stats
 from RadDamDNA.bioStage.models import DiffusionModel, DSBRepairModel, SSBRepairModel, BDRepairModel
 
 DAMAGED = 1
@@ -48,53 +49,69 @@ class DSBRepair(TrackPairProcess):
     def __init__(self, model='standard', pars=None):
         if model == 'standard':
             self.ActivateDSBRepairStandard(pars)
+        elif model == 'lognormtimes':
+            self.ActivateDSBRepairLogNormTimes(pars)
 
     def ActivateDSBRepairStandard(self, pars=None):
         self.model = DSBRepairModel('standard', pars)
         self.InteractionRadius = 1e8
 
+    def ActivateDSBRepairLogNormTimes(self, pars=None):
+        self.model = DSBRepairModel('lognormtimes', pars)
+        self.InteractionRadius = 1e8
+
     def Repair(self, tracklist, timestep):
-        if self.model.Model == 'standard':
-            ntracks = len(tracklist)
-            probmatrix = np.zeros([ntracks, ntracks])
-            for i in range(ntracks):
+        ntracks = len(tracklist)
+        probmatrix = np.zeros([ntracks, ntracks])
+        for i in range(ntracks):
+            for j in range(i+1, ntracks):
+                if tracklist[i].GetLastStep().Status == DAMAGED and tracklist[j].GetLastStep().Status == DAMAGED:
+                    probmatrix[i, j] = self.GetStandardPairwiseProbability(tracklist[i], tracklist[j], timestep)
+                else:
+                    probmatrix[i, j] = 0.0
+        rs = np.random.random([ntracks, ntracks])
+        rs[probmatrix == 0.0] = 1.0
+        repaired = rs <= probmatrix
+        # Avoid multiple uses of the same and: pick from maximum to minimum probability
+        for i in range(ntracks):
+            maxFori = 0.0
+            repj = 0
+            for j in range(i+1, ntracks):
+                if repaired[i, j] and probmatrix[i, j] > maxFori:
+                    maxFori = probmatrix[i, j]
+                    repj = j
+            if repj > 0:
+                for k in range(ntracks):
+                    repaired[repj, k] = False
                 for j in range(i+1, ntracks):
-                    if tracklist[i].GetLastStep().Status == DAMAGED and tracklist[j].GetLastStep().Status == DAMAGED:
-                        probmatrix[i, j] = self.GetStandardPairwiseProbability(tracklist[i], tracklist[j], timestep)
-                    else:
-                        probmatrix[i, j] = 0.0
-            rs = np.random.random([ntracks, ntracks])
-            rs[probmatrix == 0.0] = 1.0
-            repaired = rs <= probmatrix
-            # Avoid multiple uses of the same and: pick from maximum to minimum probability
-            for i in range(ntracks):
-                maxFori = 0.0
-                repj = 0
-                for j in range(i+1, ntracks):
-                    if repaired[i, j] and probmatrix[i, j] > maxFori:
-                        maxFori = probmatrix[i, j]
-                        repj = j
-                if repj > 0:
-                    for k in range(ntracks):
-                        repaired[repj, k] = False
-                    for j in range(i+1, ntracks):
-                        if j != repj:
-                            repaired[i, j] = False
-            return repaired
+                    if j != repj:
+                        repaired[i, j] = False
+        return repaired
 
     def GetStandardPairwiseProbability(self, betrack1, betrack2, timestep):
-        distance = self._getDistance(betrack1, betrack2)
-        if distance > self.InteractionRadius:
-            return 0.0
-        else:
-            fd = np.exp(-distance**2 / (2*self.model.sigmaDistance**2))
-            if self.model.competentInNEHJ:
-                if betrack1.GetLastStep().Complexity < 10.03 and betrack2.GetLastStep().Complexity < 10.03:
-                    return (1.0 - np.exp(-self.model.repairRateNCNC * timestep)) * fd
-                else:
-                    return (1.0 - np.exp(-self.model.repairRateComplex * timestep)) * fd
+        if self.model.Model == 'standard':
+            distance = self._getDistance(betrack1, betrack2)
+            if distance > self.InteractionRadius:
+                return 0.0
             else:
-                return (1.0 - np.exp(-self.model.repairMMEJ * timestep)) * fd
+                fd = np.exp(-distance**2 / (2*self.model.sigmaDistance**2))
+                if self.model.competentInNEHJ:
+                    if betrack1.GetLastStep().Complexity < 10.03 and betrack2.GetLastStep().Complexity < 10.03:
+                        return (1.0 - np.exp(-self.model.repairRateNCNC * timestep)) * fd
+                    else:
+                        return (1.0 - np.exp(-self.model.repairRateComplex * timestep)) * fd
+                else:
+                    return (1.0 - np.exp(-self.model.repairMMEJ * timestep)) * fd
+        elif self.model.Model == 'lognormtimes':
+            distance = self._getDistance(betrack1, betrack2)
+            if distance > self.InteractionRadius:
+                return 0.0
+            else:
+                fd = np.exp(-distance**2 / (2*self.model.sigmaDistance**2))
+                complexity = int(np.round((betrack1.GetLastStep().Complexity + betrack2.GetLastStep().Complexity) / 2))
+                dist = stats.lognorm(self.model.sigma[complexity-2], scale=self.model.mu[complexity-2])
+                prob = dist.cdf(timestep) * fd
+                return prob
 
     @property
     def CompetentInNEHJ(self):

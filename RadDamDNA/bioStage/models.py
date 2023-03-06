@@ -6,6 +6,8 @@ Created on 1/22/23 2:47 PM
 @author: alejandrobertolet
 """
 
+import numpy as np
+
 class DiffusionModel:
     def __init__(self, name, pars=None):
         self.Model = name
@@ -61,6 +63,23 @@ class DSBRepairModel:
                 except:
                     self.repairMMEJUnits = 'rep/s'
                 self.sigmaDistance = pars['sigma']
+                try:
+                    self.sigmaDistanceUnits = pars['sigmaUnits']
+                except:
+                    self.sigmaDistanceUnits = 'um'
+        if self.Model == 'lognormtimes':
+            if pars is None:
+                self.mu = np.linspace(1, 36, 19) * 3600 # Mu of the lognormal dist as a function of complexity
+                self.sigma = np.linspace(0.05, 0.35, 19) * 3600 # Sigma of the lognormal dist as a function of complexity
+                self.sigmaDistance = 0.25
+                self.sigmaDistanceUnits = 'um'
+            else:
+                self.mu = pars['mu']
+                self.sigma = pars['sigma']
+                try:
+                    self.sigmaDistance = pars['sigmaDistance']
+                except:
+                    self.sigmaDistance = 0.25
                 try:
                     self.sigmaDistanceUnits = pars['sigmaUnits']
                 except:
