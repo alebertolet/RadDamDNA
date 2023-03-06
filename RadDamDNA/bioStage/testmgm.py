@@ -27,7 +27,7 @@ print(calc.getNumberOfSitesWithDSB(perTrack=True))
 
 # Distribute damages over a nucleus with radius 3.5 um. Dose scales the number of damage sites.
 # This returns a list of damage sites with position (x, y, z), and complexity
-dose = 2 #Gy
+dose = 4 #Gy
 damages = calc.DistributeDamageOverNucleus(dose=dose, radius=3.5, inTracks=True)
 print('Number of sites for ' + str(dose) + ' Gy: ' + str(len(damages)))
 #calc.PlotDistributedDamageOverNucleus()
@@ -42,6 +42,10 @@ timeOptions = [initTime, finalTime, nSteps]
 mu = np.linspace(1, 36, 19) * 3600 # Means 1 h for complexity 2, 36 hours for complexity 20
 sigma = np.linspace(0.05, 0.35, 19) * 3600 # Sigma of the lognormal dist as a function of complexity
 dsbpars = {'mu': mu, 'sigma': sigma}
+
+# Another option is the 'standard' repair model with complex and non-complex dsb repair
+# dsbpars = {'rComplex': 1.0e-5, 'rNCNC': 2.0e-4}
+# Activate this option by setting dsbmodel='standard' in the simulator
 
 # Probability for a misrepaired dsb to become a lethal chromosome aberration
 p_lethal_aberration = 0.08

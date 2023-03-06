@@ -66,7 +66,7 @@ class DSBRepair(TrackPairProcess):
         for i in range(ntracks):
             for j in range(i+1, ntracks):
                 if tracklist[i].GetLastStep().Status == DAMAGED and tracklist[j].GetLastStep().Status == DAMAGED:
-                    probmatrix[i, j] = self.GetStandardPairwiseProbability(tracklist[i], tracklist[j], timestep)
+                    probmatrix[i, j] = self.GetPairwiseProbability(tracklist[i], tracklist[j], timestep)
                 else:
                     probmatrix[i, j] = 0.0
         rs = np.random.random([ntracks, ntracks])
@@ -88,7 +88,7 @@ class DSBRepair(TrackPairProcess):
                         repaired[i, j] = False
         return repaired
 
-    def GetStandardPairwiseProbability(self, betrack1, betrack2, timestep):
+    def GetPairwiseProbability(self, betrack1, betrack2, timestep):
         if self.model.Model == 'standard':
             distance = self._getDistance(betrack1, betrack2)
             if distance > self.InteractionRadius:
