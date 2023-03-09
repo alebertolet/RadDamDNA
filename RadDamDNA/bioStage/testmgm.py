@@ -10,7 +10,7 @@ from mgm import mgm
 from running import Simulator
 
 # Data file, format is 'microdose' (3 columns with energy, specific energy and lineal energy)
-data_file = '/Users/ai925/source/MGM/scripts/xray_microdosimetry_1um.phsp'
+data_file = '/Users/ai925/source/MGM/scripts/xray250keV.phsp'
 
 # Other supported formats are:
 # - A list of lineal energy values; each value in a new row
@@ -44,8 +44,7 @@ sigma = np.linspace(0.05, 0.35, 19) * 3600 # Sigma of the lognormal dist as a fu
 dsbpars = {'mu': mu, 'sigma': sigma}
 
 # Another option is the 'standard' repair model with complex and non-complex dsb repair
-# dsbpars = {'rComplex': 1.0e-5, 'rNCNC': 2.0e-4}
-# Activate this option by setting dsbmodel='standard' in the simulator
+# dsbpars = {'rComplex': 1.0e-5, 'rNCNC': 2.0e-4, '}
 
 # Probability for a misrepaired dsb to become a lethal chromosome aberration
 p_lethal_aberration = 0.08
