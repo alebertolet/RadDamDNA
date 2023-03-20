@@ -42,7 +42,7 @@ class Simulator:
                                      p_lethal_aberration=p_lethal_aberration, p_apoptosis=p_apoptosis, time_to_G1S_checkpoint=time_to_G1S_checkpoint,
                                      time_to_G2M_checkpoint=time_to_G2M_checkpoint)
 
-    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None, plot=True, outputnorm=True, verbose=0):
+    def Run(self, nRuns, rereadDamageForNewRuns=True, basepath=None, maxDose=-1, version=None, plot=True, outputnorm=True, verbose=0, getVideo=False):
         self.nRuns = nRuns
         self.runManager.nRuns = nRuns
         self.runManager.maxDose = maxDose
@@ -50,7 +50,7 @@ class Simulator:
         if plot:
             self.runManager.plotflag = True
         if not rereadDamageForNewRuns:
-            self.runManager.Run(verbose=verbose, outputnorm=outputnorm)
+            self.runManager.Run(verbose=verbose, outputnorm=outputnorm, getVideo=getVideo)
         else:
             self.runManager.TotalRuns = self.nRuns
             self.runManager.plotflag = False
@@ -59,10 +59,10 @@ class Simulator:
                 if i == self.nRuns - 1 and plot:
                     self.runManager.plotflag = True
                 if i == 0:
-                    self.runManager.Run(verbose=verbose, outputnorm=outputnorm)
+                    self.runManager.Run(verbose=verbose, outputnorm=outputnorm, getVideo=getVideo)
                 else:
                     self.ReadDamage(basepath, maxDose, version)
-                    self.runManager.Run(verbose=verbose, outputnorm=outputnorm)
+                    self.runManager.Run(verbose=verbose, outputnorm=outputnorm, getVideo=getVideo)
         self.avgRemainingDSBOverTime = self.runManager.runoutputDSB
         self.avgMisrepairedDSBOverTime = self.runManager.runoutputMisrepairedDSB
 
@@ -77,14 +77,17 @@ class Simulator:
                     maxDose = [maxDose] * npaths
                 else:
                     maxDose = [maxDose[0]] * npaths
+        else:
+            basepath = [basepath]
+            maxDose = [maxDose]
         totalaccumulateddose = 0
-        for ib, basepath in enumerate(basepath):
-            nfiles = len(os.listdir(basepath))
+        for ib, bpath in enumerate(basepath):
+            nfiles = len(os.listdir(bpath))
             # Section to get what directories actually contains both dose and SDD. Disregard others!
             listOfAvailableDirs = []
             for j in range(nfiles):
-                newpath = basepath + str(j) + '/'
-                if str(j) in os.listdir(basepath):
+                newpath = bpath + str(j) + '/'
+                if str(j) in os.listdir(bpath):
                     files = os.listdir(newpath)
                     if 'DNADamage_sdd.txt' in files and 'DNADamage.phsp' in files:
                         if os.path.getsize(newpath + 'DNADamage_sdd.txt') > 0:  # only those with actual data
@@ -97,7 +100,7 @@ class Simulator:
                 time = self._getTimeForDose(accumulatedose)
                 if 0 < self.irradiationTime < time:
                     time = 1e20
-                path = basepath + str(e) + '/'
+                path = bpath + str(e) + '/'
                 damage.readSDDAndDose(path, version=version, particleTime=time, lesionTime=time)
             totalaccumulateddose += accumulatedose
         damage.populateDamages(getVideo=False, stopAtDose=-1, stopAtTime=0, recalculatePerEachTrack=recalculatePerEachTrack)
@@ -109,6 +112,8 @@ class Simulator:
         self.runManager.damage = None
 
     def _getTimeForDose(self, d):
+        if d == 0:
+            return 0
         if self.irradiationTime == 0:
             return 0
         if self.doseratefunction is None:
@@ -120,7 +125,7 @@ class Simulator:
         if self.doseratefunction == 'exponential':
             constant = np.log(2) / self.doseratefunctionargs[1]
             initialdoserate = self.doseratefunctionargs[0]
-            return -1/constant * np.log(1-d/(initialdoserate/constant))
+            return -1/constant * np.log(1-constant*d/initialdoserate)
 
     def GetSurvivalFraction(self):
         return self.runManager.GetSurvivalFraction()
@@ -254,14 +259,15 @@ class RunManager:
                     self.betracks.append(newBeTrack)
                     self.trackid += 1
 
-    def Run(self, verbose=0, outputnorm=True):
+    def Run(self, verbose=0, outputnorm=True, getVideo=False):
         if not self.mgmFlag:
             self.originaldamage = deepcopy(self.damage)
         for i in range(self.nRuns):
             self.InitializeNewRun()
-            if self.mgmFlag:
-                self.InitializeNewTracks(self.damage)
-                self.CountCurrentDSB()
+            self.InitializeNewTracks(self.damage)
+            self.CountCurrentDSB()
+            if getVideo:
+                self._storeImages()
             self.repairedList = []
             self.misrepairedlist = []
             self.currentrun += 1
@@ -278,10 +284,12 @@ class RunManager:
                         print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h - Dose: " + str(round(self.damage.cumulativeDose, 2)) + " Gy. Number of DSB: " + str(self.damage.numDSB))
                     else:
                         print("Time " + str(round(self.clock.CurrentTime/3600,2)) + " h. Number of DSB: " + str(self.numDSB))
-                if not self.mgmFlag:
-                    self.InitializeNewTracks(self.damage)
                 self.clock.AdvanceTimeStep()
                 self.DoOneStep()
+                if not self.mgmFlag:
+                    self.InitializeNewTracks(self.damage)
+                if getVideo:
+                    self._storeImages()
             if DSB in self.outputs:
                 self.runoutputDSB.AddTimeCurveForSingleRun(self.outDSB)
                 self.runoutputMisrepairedDSB.AddTimeCurveForSingleRun(self.misrepDSB)
@@ -382,11 +390,11 @@ class RunManager:
                     self.bdamages[i].Status = REPAIRED
 
     def CountCurrentDSB(self):
-        self.numDSB = 0
-        for be in self.betracks:
-            if be.GetLastStep().Status == DAMAGED:
-                self.numDSB += 0.5
-        self.numDSB = int(self.numDSB)
+        self.numDSB = self.damage.numDSB
+        # for be in self.betracks:
+        #     if be.GetLastStep().Status == DAMAGED:
+        #         self.numDSB += 0.5
+        # self.numDSB = int(self.numDSB)
 
     def UpdateDamageMaps(self):
         if not self.mgmFlag:
@@ -416,6 +424,20 @@ class RunManager:
         self.CountCurrentDSB()
         self.outDSB.AddTimePoint(self.clock.CurrentTime, self.numDSB)
         self.misrepDSB.AddTimePoint(self.clock.CurrentTime, len(self.misrepairedlist))
+
+    def _storeImages(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        folder_path = os.path.join(script_dir, 'images2D')
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        folder_path_3D = os.path.join(script_dir, 'images3D')
+        if not os.path.exists(folder_path_3D):
+            os.makedirs(folder_path_3D)
+        time = str(np.round(self.clock.CurrentTime / 3600, 2))
+        name = os.path.join(folder_path, '2D_' + str(self.currentrun) + '_' + time + '.png')
+        name_3D = os.path.join(folder_path_3D, '3D_' + str(self.currentrun) + '_' + time + '.png')
+        self.damage.produce2DImages(saveFile=name, onlyz=True, title= time + ' hours - Dose: ' + str(np.round(self.damage.cumulativeDose, 2)) + ' Gy - DSB: ' + str(self.numDSB))
+        self.damage.produce3DImage(show=False, saveFile=name_3D, title= time + ' hours - Dose: ' + str(np.round(self.damage.cumulativeDose, 2)) + ' Gy - DSB: ' + str(self.numDSB))
 
     def _checkPosWithinNucleus(self, pos):
         if self.nucleusMaxRadius is None:

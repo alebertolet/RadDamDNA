@@ -1055,7 +1055,7 @@ class DamageToDNA:
         return np.sqrt(np.sum(np.power(a-b, 2)))
 
     def produce3DImage(self, show=True, microscopePSFWidth = 0.4, resolution = 0.4, xmin = -5, xmax = 5, ymin = -5, ymax = 5, zmin = -5, zmax = 5,
-                       indQuantity='Dose', indValueString=''):
+                       indQuantity='Dose', indValueString='', saveFile=None, title=None, useSites=False):
         dx = resolution
         dy = resolution
         dz = resolution
@@ -1080,8 +1080,6 @@ class DamageToDNA:
                     v = self.Gaussian3D(xpos, ypos, zpos, microscopePSFWidth)
                     psf[ix, iy, iz] = v
                     sum = sum + v
-        # Normalize
-        psf = psf / sum
         # Convolves PSF for each DSB position
         for iDsb in range(len(self.DSBPositions)):
             idx = int(np.floor((self.DSBPositions[iDsb][0] - xmin) / dx + 1e-14))
@@ -1126,22 +1124,27 @@ class DamageToDNA:
         v = np.array(v)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        if indQuantity == 'Dose':
-            ax.set_title('Dose = ' + str(np.round(self.cumulativeDose, 2)) + ' Gy')
-        elif indValueString == '':
-            ax.set_title()
+        if title is not None:
+            ax.set_title(title)
         else:
-            ax.set_title(indQuantity + ' = ' + indValueString)
-        img = ax.scatter(x, y, z, c=v, cmap='MyColorMapAlpha', marker='s', s=20)
+            if indQuantity == 'Dose':
+                ax.set_title('Dose = ' + str(np.round(self.cumulativeDose, 2)) + ' Gy')
+            elif indValueString == '':
+                ax.set_title()
+            else:
+                ax.set_title(indQuantity + ' = ' + indValueString)
+        img = ax.scatter(x, y, z, c=v, cmap='MyColorMapAlpha', marker='s', s=20, vmax=1)
         fig.colorbar(img)
         if show:
             plt.show()
+        elif saveFile is not None:
+            plt.savefig(saveFile)
         else:
             d = os.getcwd() + '/RadDamDNA/video/'
             nfiles = len(os.listdir(d))
             plt.savefig(d + str(nfiles) + '.png')
 
-    def produce2DImages(self, microscopePSFWidth = 0.8, resolution = 0.1, xmin = -5, xmax = 5, ymin = -5, ymax = 5):
+    def produce2DImages(self, microscopePSFWidth = 0.8, resolution = 0.1, xmin = -5, xmax = 5, ymin = -5, ymax = 5, saveFile=None, onlyz=False, title=None, useSites=False):
         halfSize = int(np.floor(3*microscopePSFWidth / resolution))
         if halfSize < 3:
             halfSize = 3
@@ -1156,15 +1159,22 @@ class DamageToDNA:
                 v = self.Gaussian2D(xpos, ypos, microscopePSFWidth)
                 psf[ix, iy] = v
                 sum = sum + v
-        psf = psf / sum
         fig = plt.figure()
         # Different planes (0,1), (0,2) and (1,2)
-        ids1 = [0, 0, 1]
-        ids2 = [1, 2, 2]
-        pos = [131, 132, 133]
-        titles = ['Z-plane', 'Y-plane', 'X-plane']
-        xaxislbl = [r'x ($\mu$m)', r'x ($\mu$m)', r'y ($\mu$m)']
-        yaxislbl = [r'y ($\mu$m)', r'z ($\mu$m)', r'z ($\mu$m)']
+        if not onlyz:
+            ids1 = [0, 0, 1]
+            ids2 = [1, 2, 2]
+            pos = [131, 132, 133]
+            titles = ['Z-plane', 'Y-plane', 'X-plane']
+            xaxislbl = [r'x ($\mu$m)', r'x ($\mu$m)', r'y ($\mu$m)']
+            yaxislbl = [r'y ($\mu$m)', r'z ($\mu$m)', r'z ($\mu$m)']
+        else:
+            ids1 = [0]
+            ids2 = [1]
+            pos = [111]
+            titles = ['Z-plane']
+            xaxislbl = [r'x ($\mu$m)']
+            yaxislbl = [r'y ($\mu$m)']
         for id in range(len(ids1)):
             dx = resolution
             dy = resolution
@@ -1190,14 +1200,20 @@ class DamageToDNA:
                     for j in range(starty, endy):
                         img2d[i, j] = img2d[i, j] + psf[i - startx, j - starty]
             ax = fig.add_subplot(pos[id])
-            ax.imshow(img2d, cmap='MyColorMapAlpha', extent=[xmin, xmax, ymin, ymax], origin='lower')
-            ax.set_title(titles[id])
+            ax.imshow(img2d, cmap='MyColorMapAlpha', extent=[xmin, xmax, ymin, ymax], origin='lower', vmax=1)
+            if title is None:
+                ax.set_title(titles[id])
+            else:
+                ax.set_title(title)
             #ax.set_xticks([j for j in np.linspace(xmin, xmax, 5)])
             #ax.set_yticks([j for j in np.linspace(ymin, ymax, 5)])
             ax.set_xlabel(xaxislbl[id])
             ax.set_ylabel(yaxislbl[id])
             ax.set_aspect('equal')
-        plt.show()
+        if saveFile is None:
+            plt.show()
+        else:
+            plt.savefig(saveFile)
 
     def Gaussian3D(self, x, y, z, sigma):
         return np.exp(-(x ** 2 + y ** 2 + z ** 2) / (2 * sigma ** 2))

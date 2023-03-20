@@ -10,7 +10,7 @@ from mgm import mgm
 from running import Simulator
 
 # Data file, format is 'microdose' (3 columns with energy, specific energy and lineal energy)
-data_file = '/Users/ai925/source/MGM/scripts/xray250keV.phsp'
+data_file = '/Users/ai925/source/MGM/scripts/proton5MeV.phsp'
 
 # Other supported formats are:
 # - A list of lineal energy values; each value in a new row
@@ -27,7 +27,7 @@ print(calc.getNumberOfSitesWithDSB(perTrack=True))
 
 # Distribute damages over a nucleus with radius 3.5 um. Dose scales the number of damage sites.
 # This returns a list of damage sites with position (x, y, z), and complexity
-dose = 4 #Gy
+dose = 1 #Gy
 damages = calc.DistributeDamageOverNucleus(dose=dose, radius=3.5, inTracks=True)
 print('Number of sites for ' + str(dose) + ' Gy: ' + str(len(damages)))
 #calc.PlotDistributedDamageOverNucleus()
@@ -61,7 +61,7 @@ sim = Simulator(timeOptions=timeOptions, diffusionmodel='free', dsbmodel='lognor
 # Load damage from mgm
 sim.LoadDamageFromMGM(damages)
 # Run simulation
-nCellsSimulated = 50
+nCellsSimulated = 5
 sim.Run(nCellsSimulated, rereadDamageForNewRuns=False, basepath=None, maxDose=-1, version=None, plot=True, outputnorm=True, verbose=2)
 survivalfraction = sim.GetSurvivalFraction()
 
