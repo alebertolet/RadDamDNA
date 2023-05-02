@@ -212,21 +212,24 @@ class SDDDamageSite:
         for i in range(0, self.ndamages):
             damage = {}
             subid = int(v[i*3])
+            damage['type'] = int(v[i * 3 + 2])
             if float(self.version) < 2.0:
                 damage['subcomponent'] = subid
             else:
                 if subid == 1:
                     damage['subcomponent'] = 2
-                    nbreaksStrand1 += 1
+                    if damage['type'] > 0:
+                        nbreaksStrand1 += 1
                 elif subid == 2:
                     damage['subcomponent'] = 1
                 elif subid == 3:
                     damage['subcomponent'] = 4
                 elif subid == 4:
                     damage['subcomponent'] = 3
-                    nbreaksStrand2 += 1
+                    if damage['type'] > 0:
+                        nbreaksStrand2 += 1
             damage['basepairID'] = int(v[i*3+1])
-            damage['type'] = int(v[i*3+2])
+
             if damage['type'] == 4:
                 damage['type'] = 1
             if damage['type'] == 5:
