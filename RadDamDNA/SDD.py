@@ -195,9 +195,9 @@ class SDDDamageSite:
     @DamageTypes.setter
     def DamageTypes(self, v):
         self._damageTypes = v
-        self.numberofbasedamages = int(v[0])
-        self.numberofstrandbreaks = int(v[1])
-        self.isThereDSB = int(v[2])
+        #self.numberofbasedamages0 = int(v[0])
+        #self.numberofstrandbreaks0 = int(v[1])
+        #self.isThereDSB = int(v[2])
 
     @property
     def FullBreakSpec(self):
@@ -209,6 +209,7 @@ class SDDDamageSite:
         self.individualdamages = []
         nbreaksStrand1 = 0
         nbreaksStrand2 = 0
+        nbasedamages = 0
         for i in range(0, self.ndamages):
             damage = {}
             subid = int(v[i*3])
@@ -222,14 +223,17 @@ class SDDDamageSite:
                         nbreaksStrand1 += 1
                 elif subid == 2:
                     damage['subcomponent'] = 1
+                    if damage['type'] > 0:
+                        nbasedamages += 1
                 elif subid == 3:
                     damage['subcomponent'] = 4
+                    if damage['type'] > 0:
+                        nbasedamages += 1
                 elif subid == 4:
                     damage['subcomponent'] = 3
                     if damage['type'] > 0:
                         nbreaksStrand2 += 1
             damage['basepairID'] = int(v[i*3+1])
-
             if damage['type'] == 4:
                 damage['type'] = 1
             if damage['type'] == 5:
@@ -237,6 +241,10 @@ class SDDDamageSite:
             self.individualdamages.append(damage)
         # Count number of DSB
         self.numberofDSBs = min([nbreaksStrand1, nbreaksStrand2])
+        if self.numberofDSBs > 0:
+            self.isThereDSB = True
+        self.numberofbasedamages = nbasedamages
+        self.numberofstrandbreaks = nbreaksStrand1 + nbreaksStrand2
 
     @property
     def DNASequence(self):
